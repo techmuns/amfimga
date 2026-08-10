@@ -172,6 +172,9 @@ npm run data                  # ingest --latest, then derive
 
 ## Scope discipline
 
-Build this project one step at a time. Steps 1–3 (setup, ingestion, derived
-signals) are done. Do not build the full dashboard screens until the step that
-calls for them. When in doubt, keep the five rules and the data shape intact.
+Build this project one step at a time. Steps 1–4 (setup, ingestion, derived
+signals, main dashboard) are done. The dashboard follows a fixed design system
+(tokens in `src/index.css`: one font, standardized sizes, the palette, sector
+colours, chart-mark rules) — use it exactly; never invent colours or fonts.
+Next up: the per-stock detail page. When in doubt, keep the five rules, the data
+shape, and the design system intact.

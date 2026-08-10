@@ -158,6 +158,13 @@ export interface StockRow {
   fundCount: (number | null)[];
   /** Per-month net share change vs the previous month. `null` = no prior month or a coverage gap. */
   netShareChange: (number | null)[];
+  /**
+   * Fund houses whose entering/leaving the data affected the LATEST month's net
+   * change for this stock (so the UI can explain it on hover). Present only when
+   * it happened. `entered` = house's shares aren't counted as buying; `left` =
+   * its previous shares aren't counted.
+   */
+  coverageAffected?: { house: string; direction: "entered" | "left" }[];
 }
 
 /** `public/data/stocks/<ISIN>.json` — per-stock detail, loaded on demand. */

@@ -1,28 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
-import type { MonthMeta, StockRow, StocksSummary, SummaryMeta } from "./types/holdings";
-import { loadStocks, loadSummary } from "./lib/data";
-import { DASH, formatSignedCount } from "./lib/format";
+import type { SectorSummary, StockRow, StocksSummary, SummaryMeta } from "./types/holdings";
+import { loadSectors, loadStocks, loadSummary } from "./lib/data";
+import { DASH, formatCount, formatSignedCount } from "./lib/format";
+import { buildSectorScale } from "./lib/palette";
+import { getInitialTheme, setTheme, type Theme } from "./lib/theme";
+import { TooltipProvider } from "./components/Tooltip";
+import { DivergingBars, type DivRow } from "./components/charts";
+import { StockTable } from "./components/StockTable";
 
+type Data = { summary: SummaryMeta; stocks: StocksSummary; sectors: SectorSummary };
 type LoadState =
   | { status: "loading" }
   | { status: "error"; reason: string }
-  | { status: "ready"; summary: SummaryMeta; stocks: StocksSummary };
+  | { status: "ready"; data: Data };
 
 export function App() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadSummary(), loadStocks()])
-      .then(([summary, stocks]) => {
-        if (!cancelled) setState({ status: "ready", summary, stocks });
+    Promise.all([loadSummary(), loadStocks(), loadSectors()])
+      .then(([summary, stocks, sectors]) => {
+        if (!cancelled) setState({ status: "ready", data: { summary, stocks, sectors } });
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setState({
-            status: "error",
-            reason: err instanceof Error ? err.message : "Unknown error",
-          });
+          setState({ status: "error", reason: err instanceof Error ? err.message : "Unknown error" });
         }
       });
     return () => {
@@ -31,163 +34,138 @@ export function App() {
   }, []);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <Header />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 sm:py-14">
-        <p className="text-sm font-medium tracking-wide text-indigo-600 dark:text-indigo-400">
-          Step 3 · Buy/sell signals
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-          Where the funds are moving
-        </h1>
-        <p className="mt-3 max-w-2xl text-slate-600 dark:text-slate-300">
-          Net change in shares held across India's mutual funds, month over month.
-          Positive means funds are net <strong>buying</strong>; negative means net{" "}
-          <strong>selling</strong>. Changes only compare funds present in both
-          months — a fund house missing from a month is shown as {DASH}, never
-          counted as a seller.
-        </p>
-
-        {state.status === "loading" && <Note>Loading summaries…</Note>}
-        {state.status === "error" && (
-          <Note tone="error">Couldn&apos;t load the data: {state.reason}</Note>
-        )}
-        {state.status === "ready" && (
-          <Movers summary={state.summary} stocks={state.stocks} />
-        )}
-      </main>
-      <Footer />
-    </div>
+    <TooltipProvider>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "26px 24px 64px" }}>
+        {state.status === "loading" && <p className="t-muted">Loading…</p>}
+        {state.status === "error" && <p className="t-body" style={{ color: "var(--sell)" }}>Couldn&apos;t load data: {state.reason}</p>}
+        {state.status === "ready" && <Dashboard data={state.data} />}
+      </div>
+    </TooltipProvider>
   );
 }
 
-function Movers({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummary }) {
+function Dashboard({ data }: { data: Data }) {
+  const { summary, stocks, sectors } = data;
   const last = stocks.months.length - 1;
-  const meta: MonthMeta | undefined = summary.months[summary.months.length - 1];
+  const month = summary.months[summary.months.length - 1];
+  const scale = useMemo(() => buildSectorScale(stocks.stocks, last), [stocks, last]);
 
-  const { buys, sells } = useMemo(() => {
-    const withChange = stocks.stocks
-      .map((s) => ({ s, net: s.netShareChange[last] }))
-      .filter((x): x is { s: StockRow; net: number } => x.net != null && x.net !== 0);
-    const buys = [...withChange].sort((a, b) => b.net - a.net).slice(0, 10);
-    const sells = [...withChange].sort((a, b) => a.net - b.net).slice(0, 10);
-    return { buys, sells };
-  }, [stocks, last]);
-
-  if (!meta) return <Note>No months available yet.</Note>;
+  const moves = useMemo(() => buildMoveRows(stocks.stocks, last), [stocks, last]);
+  const sectorRows = useMemo(() => buildSectorRows(sectors, sectors.months.length - 1), [sectors]);
 
   return (
-    <section className="mt-8">
-      <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm dark:border-slate-800 dark:bg-slate-900">
-        <span className="font-semibold">{meta.label}</span>
-        <span className="text-slate-500 dark:text-slate-400">
-          {" "}· based on <strong>{meta.housesPresent}</strong> of {meta.housesTotal}{" "}
-          fund houses · {meta.stockCount.toLocaleString("en-IN")} stocks ·{" "}
-          {meta.fundCount} funds
-        </span>
-      </div>
-
-      <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        <MoverList
-          title="Top 10 net buys"
-          accent="text-emerald-600 dark:text-emerald-400"
-          rows={buys}
-        />
-        <MoverList
-          title="Top 10 net sells"
-          accent="text-rose-600 dark:text-rose-400"
-          rows={sells}
-        />
-      </div>
-
-      <p className="mt-6 text-xs text-slate-400 dark:text-slate-500">
-        Net share change vs the previous month, summed across funds present in both
-        months. Full sortable tables and per-stock detail come next.
-      </p>
-    </section>
-  );
-}
-
-function MoverList({
-  title,
-  accent,
-  rows,
-}: {
-  title: string;
-  accent: string;
-  rows: { s: StockRow; net: number }[];
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      <ol className="mt-3 space-y-2">
-        {rows.length === 0 && (
-          <li className="text-sm text-slate-400">Nothing comparable this month.</li>
-        )}
-        {rows.map(({ s, net }) => (
-          <li key={s.isin} className="flex items-baseline justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium">{s.name}</div>
-              <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                {s.sector ?? DASH}
-              </div>
-            </div>
-            <div className={`shrink-0 font-mono text-sm tabular-nums ${accent}`}>
-              {formatSignedCount(net)}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-function Header() {
-  return (
-    <header className="border-b border-slate-200 dark:border-slate-800">
-      <div className="mx-auto flex w-full max-w-4xl items-center px-6 py-4">
-        <div className="flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-            A
-          </span>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">AMFIMGA</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              Fund holdings tracker
-            </div>
+    <>
+      <header className="flex items-start gap-4">
+        <div>
+          <h1 className="t-title">Mutual fund moves</h1>
+          <div className="t-muted" style={{ marginTop: 3 }}>
+            Based on {month.housesPresent} of {month.housesTotal} fund houses this month.
           </div>
         </div>
-      </div>
-    </header>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="t-section" style={{ color: "var(--ink-2)" }}>{month.label}</span>
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <section style={{ marginTop: 26 }}>
+        <div className="t-section">Biggest moves this month</div>
+        <div className="t-muted" style={{ margin: "2px 0 10px" }}>Selling ← → Buying · net change in shares held</div>
+        <DivergingBars rows={moves.rows} maxAbs={moves.max} />
+      </section>
+
+      <section style={{ marginTop: 30 }}>
+        <div className="t-section">Where the money moved</div>
+        <div className="t-muted" style={{ margin: "2px 0 10px" }}>Net share change by sector · green in, red out</div>
+        <DivergingBars rows={sectorRows.rows} maxAbs={sectorRows.max} />
+      </section>
+
+      <section style={{ marginTop: 30 }}>
+        <div className="t-section" style={{ marginBottom: 10 }}>All stocks</div>
+        <StockTable data={stocks} scale={scale} monthIdx={last} />
+      </section>
+    </>
   );
 }
 
-function Note({
-  children,
-  tone = "default",
-}: {
-  children: React.ReactNode;
-  tone?: "default" | "error";
-}) {
+function ThemeToggle() {
+  const [theme, setLocal] = useState<Theme>(() => getInitialTheme());
+  const flip = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    setLocal(next);
+  };
   return (
-    <div
-      className={`mt-8 rounded-2xl border p-6 ${
-        tone === "error"
-          ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
-          : "border-slate-200 bg-white text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
-      }`}
-    >
-      {children}
+    <button className="theme-btn" onClick={flip} aria-label="Toggle theme">
+      {theme === "dark" ? "☀ Light" : "☾ Dark"}
+    </button>
+  );
+}
+
+function coverageLines(s: StockRow) {
+  if (!s.coverageAffected?.length) return null;
+  return (
+    <div style={{ marginTop: 6, color: "var(--ink-2)" }}>
+      {s.coverageAffected.map((c, i) => (
+        <div key={i}>
+          {c.house}{" "}
+          {c.direction === "entered"
+            ? "entered the data this month — its shares aren't counted as buying."
+            : "left the data this month — its previous shares aren't counted."}
+        </div>
+      ))}
     </div>
   );
 }
 
-function Footer() {
-  return (
-    <footer className="border-t border-slate-200 dark:border-slate-800">
-      <div className="mx-auto w-full max-w-4xl px-6 py-4 text-xs text-slate-400 dark:text-slate-500">
-        Data: AdvisorKhoj · official monthly disclosures
+function buildMoveRows(stocks: StockRow[], last: number): { rows: DivRow[]; max: number } {
+  const withNet = stocks
+    .map((s) => ({ s, net: s.netShareChange[last] }))
+    .filter((x): x is { s: StockRow; net: number } => x.net != null && x.net !== 0);
+  const buys = [...withNet].sort((a, b) => b.net - a.net).slice(0, 10);
+  const sells = [...withNet].sort((a, b) => a.net - b.net).slice(0, 10);
+  const picked = [...buys, ...sells].sort((a, b) => b.net - a.net);
+  const max = Math.max(1, ...picked.map((x) => Math.abs(x.net)));
+  const rows: DivRow[] = picked.map(({ s, net }) => ({
+    key: s.isin,
+    label: s.name,
+    value: net,
+    tip: (
+      <div>
+        <div className="t-label">{s.name}</div>
+        <div style={{ marginTop: 4 }}>
+          <span className="k">{net > 0 ? "Buying" : "Selling"}: </span>
+          {formatSignedCount(net)} shares
+        </div>
+        <div><span className="k">Funds holding: </span>{s.fundCount[last] ?? DASH}</div>
+        <div><span className="k">Total shares: </span>{formatCount(s.totalShares[last])}</div>
+        {coverageLines(s)}
       </div>
-    </footer>
-  );
+    ),
+  }));
+  return { rows, max };
+}
+
+function buildSectorRows(sectors: SectorSummary, last: number): { rows: DivRow[]; max: number } {
+  const withNet = sectors.sectors
+    .map((r) => ({ sector: r.sector, net: r.netShareChange[last] }))
+    .filter((x): x is { sector: string; net: number } => x.net != null && x.net !== 0);
+  withNet.sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  const picked = withNet.slice(0, 12).sort((a, b) => b.net - a.net);
+  const max = Math.max(1, ...picked.map((x) => Math.abs(x.net)));
+  const rows: DivRow[] = picked.map((x) => ({
+    key: x.sector,
+    label: x.sector,
+    value: x.net,
+    tip: (
+      <div>
+        <div className="t-label">{x.sector}</div>
+        <div style={{ marginTop: 4 }}>
+          <span className="k">Net change: </span>{formatSignedCount(x.net)} shares
+        </div>
+        <div className="k">{x.net > 0 ? "Money flowing in" : "Money flowing out"}</div>
+      </div>
+    ),
+  }));
+  return { rows, max };
 }

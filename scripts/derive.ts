@@ -194,6 +194,17 @@ function main(): void {
   // sector → per-month running totals (null until a known value lands).
   const sectorTotals = new Map<string, (number | null)[]>();
 
+  // Latest transition: which houses entered / left the data (for the coverage hover).
+  const houseName = new Map<string, string>();
+  for (const mi of idx) for (const mf of mi.funds.values()) houseName.set(mf.amcSlug, mf.fundHouse);
+  const L = T - 1;
+  const enteredLatest = new Set<string>();
+  const leftLatest = new Set<string>();
+  if (T >= 2) {
+    for (const h of idx[L].houses) if (!idx[L - 1].houses.has(h)) enteredLatest.add(h);
+    for (const h of idx[L - 1].houses) if (!idx[L].houses.has(h)) leftLatest.add(h);
+  }
+
   for (const isin of isins) {
     const name = nameOf.get(isin) ?? isin;
     const sector = sectorOf.get(isin) ?? null;
@@ -224,7 +235,32 @@ function main(): void {
       nsc.push(t === 0 ? null : netChange(idx[t - 1], idx[t], isin));
     }
 
-    stocks.push({ isin, name, sector, marketCap: null, totalShares, totalValueInr, fundCount, netShareChange: nsc });
+    // Coverage note: entered/left houses that actually hold this stock.
+    let coverageAffected: StockRow["coverageAffected"];
+    if (enteredLatest.size || leftLatest.size) {
+      const aff = new Map<string, "entered" | "left">();
+      for (const id of idx[L].holders.get(isin) ?? []) {
+        const s = amcSlugOf(id);
+        if (enteredLatest.has(s)) aff.set(s, "entered");
+      }
+      if (L >= 1) {
+        for (const id of idx[L - 1].holders.get(isin) ?? []) {
+          const s = amcSlugOf(id);
+          if (leftLatest.has(s)) aff.set(s, "left");
+        }
+      }
+      if (aff.size) {
+        coverageAffected = [...aff].map(([slug, direction]) => ({
+          house: houseName.get(slug) ?? slug,
+          direction,
+        }));
+      }
+    }
+
+    stocks.push({
+      isin, name, sector, marketCap: null,
+      totalShares, totalValueInr, fundCount, netShareChange: nsc, coverageAffected,
+    });
 
     // Fund-by-fund detail.
     const fundIdsEver = new Set<string>();
