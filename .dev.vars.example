@@ -1,0 +1,19 @@
+# Local development secrets for the Cloudflare Worker password gate.
+# Copy this file to `.dev.vars` (which is git-ignored) and fill in values.
+#
+# In production these are NOT read from a file — set them as Worker secrets:
+#   npx wrangler secret put APP_PASSWORD
+#   npx wrangler secret put SESSION_SECRET
+
+# The single password that unlocks the whole site.
+APP_PASSWORD=change-me
+
+# A long random string used to sign session cookies (HMAC key).
+# Generate one with:  openssl rand -hex 32
+SESSION_SECRET=generate-a-long-random-string
+
+# Set to "true" ONLY for local dev. It lets Vite's HMR/module requests through
+# the gate (so hot-reload works) while still gating the app page and /data/*.
+# It also drops the "Secure" cookie flag so cookies work over plain http://localhost.
+# This variable is absent in production, where the gate covers every request.
+DEV_MODE=true

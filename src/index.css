@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* App-wide base. The UI is theme-aware (light/dark) via Tailwind's `dark:`
+   variant, driven by the OS setting through the `prefers-color-scheme` scheme
+   declared below. */
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+  }
+}

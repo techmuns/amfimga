@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Cloudflare / Wrangler
+.wrangler/
+worker-configuration.d.ts
+
+# Local secrets — NEVER commit real passwords/secrets (see .dev.vars.example)
+.dev.vars
+.env
+.env.*
+!.env.example
+
+# Logs & OS cruft
+*.log
+.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/

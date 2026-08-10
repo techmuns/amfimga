@@ -1,0 +1,60 @@
+{
+  "month": "2026-06",
+  "source": "AdvisorKhoj (EXAMPLE placeholder data — made-up numbers, not real holdings)",
+  "funds": [
+    {
+      "fundId": "example-bluechip-fund",
+      "fundName": "Example Bluechip Equity Fund",
+      "fundHouse": "Example Asset Management",
+      "holdings": [
+        {
+          "isin": "INE001A01036",
+          "stockName": "Bharat Digital Services Ltd",
+          "shares": 1500000,
+          "marketValueInr": 1972500000,
+          "portfolioPercent": 9.88,
+          "sector": "Information Technology"
+        },
+        {
+          "isin": "INE003C01020",
+          "stockName": "Sunrise Pharma Ltd",
+          "shares": 500000,
+          "marketValueInr": 328000000,
+          "portfolioPercent": 1.64,
+          "sector": "Healthcare"
+        },
+        {
+          "isin": "INE005E01014",
+          "stockName": "Meridian Financials Ltd",
+          "shares": 250000,
+          "marketValueInr": 187500000,
+          "portfolioPercent": 0.94,
+          "sector": null
+        }
+      ]
+    },
+    {
+      "fundId": "sample-flexicap-fund",
+      "fundName": "Sample Flexicap Fund",
+      "fundHouse": "Sample Mutual Fund",
+      "holdings": [
+        {
+          "isin": "INE001A01036",
+          "stockName": "Bharat Digital Services Ltd",
+          "shares": 250000,
+          "marketValueInr": 328750000,
+          "portfolioPercent": 4.35,
+          "sector": "Information Technology"
+        },
+        {
+          "isin": "INE004D01012",
+          "stockName": "Ganga Power & Utilities Ltd",
+          "shares": 2000000,
+          "marketValueInr": 252000000,
+          "portfolioPercent": 3.10,
+          "sector": "Utilities"
+        }
+      ]
+    }
+  ]
+}
