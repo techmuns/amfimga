@@ -1,0 +1,65 @@
+name: Monthly data ingestion
+
+# Pulls the newest monthly fund-holdings disclosures and commits the resulting
+# data files. Runs on the 16th of each month (after fund houses publish the
+# prior month's disclosures), and can be triggered by hand for any month.
+
+on:
+  schedule:
+    - cron: "0 6 16 * *" # 06:00 UTC on the 16th
+  workflow_dispatch:
+    inputs:
+      month:
+        description: 'Month to ingest as YYYY-MM (blank = latest full month)'
+        required: false
+        default: ""
+      backfill:
+        description: 'Ingest all of 2023-2026 instead (true/false)'
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run ingestion
+        env:
+          SCRAPEDO_API_KEY: ${{ secrets.SCRAPEDO_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+        run: |
+          if [ "${{ inputs.backfill }}" = "true" ]; then
+            npm run ingest -- --backfill --concurrency 4
+          elif [ -n "${{ inputs.month }}" ]; then
+            npm run ingest -- --month "${{ inputs.month }}" --concurrency 4
+          else
+            npm run ingest -- --latest --concurrency 4
+          fi
+
+      - name: Commit updated data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "data: monthly ingestion ($(date -u +%Y-%m-%d))"
+            git push
+          fi

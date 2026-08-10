@@ -22,10 +22,14 @@ export interface Holding {
   shares: number | null;
   /**
    * Market value of the position in plain Indian rupees — a whole number, NOT
-   * lakhs or crores (Rule 3). `null` when not disclosed.
+   * lakhs or crores (Rule 3). `null` when not disclosed. Can be negative for
+   * short/derivative hedge legs (e.g. in arbitrage schemes).
    */
   marketValueInr: number | null;
-  /** Share of the fund's portfolio this position represents, 0–100. `null` if unknown. */
+  /**
+   * Share of the fund's portfolio this position represents. Normally 0–100, but
+   * can be slightly negative for short/derivative positions. `null` if unknown.
+   */
   portfolioPercent: number | null;
   /** Sector / industry classification. `null` when not disclosed. */
   sector: string | null;
@@ -51,6 +55,36 @@ export interface MonthData {
   source: string;
   /** The funds reported for this month. */
   funds: FundHoldings[];
+  /** ISO timestamp of the ingestion run that produced this file. Optional. */
+  generatedAt?: string;
+  /**
+   * Per-fund-house ingestion outcome for this month, so gaps are recorded
+   * honestly rather than shown as zeros (Rule 2). Optional; written by the
+   * ingestion script, ignored by the app.
+   */
+  coverage?: AmcCoverage[];
+}
+
+/** Ingestion outcome for one fund house (AMC) in one month. */
+export interface AmcCoverage {
+  /** Fund house display name, e.g. "Axis Mutual Fund". */
+  fundHouse: string;
+  /** URL slug used on AdvisorKhoj, e.g. "Axis-Mutual-Fund". */
+  amcSlug: string;
+  /**
+   * - `ok`       — downloaded and parsed this run.
+   * - `walled`   — blocked by a bot-wall; needs a scrape.do key (data is a gap).
+   * - `failed`   — link found but download/parse failed (data is a gap).
+   * - `missing`  — no disclosure link listed for this month (data is a gap).
+   * - `retained` — this run couldn't fetch it, so previously-good data was kept.
+   */
+  status: "ok" | "walled" | "failed" | "missing" | "retained";
+  /** Number of schemes parsed (when `ok`/`retained`). */
+  schemes: number;
+  /** Number of holdings parsed (when `ok`/`retained`). */
+  holdings: number;
+  /** Short human reason when not `ok`. */
+  reason?: string;
 }
 
 /** One entry in the index file. */

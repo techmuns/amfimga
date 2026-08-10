@@ -12,21 +12,11 @@ the build, so at runtime the files are served from the site root:
 ```
 public/data/index.json      ->  /data/index.json
 public/data/2026-05.json    ->  /data/2026-05.json
-public/data/2026-06.json    ->  /data/2026-06.json
 ```
 
 The app **fetches** these at runtime (`src/lib/data.ts`); it never imports them.
-This is Rule 1 — the data changes monthly, the code does not. Publishing a new
-month is a data-only change:
-
-1. Add `public/data/<YYYY-MM>.json`.
-2. Add a matching entry to `public/data/index.json` (keep the list sorted
-   oldest → newest).
-
-No rebuild of application logic is required.
-
-> Note: the files are still served **through the Worker password gate** (Rule 5),
-> so they are private — but they are static data, not code.
+This is Rule 1 — the data changes monthly, the code does not. Month files are
+produced by the ingestion script (see below), which also rebuilds the index.
 
 ## The index file — `index.json`
 
@@ -36,8 +26,7 @@ Lists which months are available. The app loads this first.
 {
   "schemaVersion": 1,
   "months": [
-    { "month": "2026-05", "label": "May 2026", "file": "/data/2026-05.json" },
-    { "month": "2026-06", "label": "June 2026", "file": "/data/2026-06.json" }
+    { "month": "2026-05", "label": "May 2026", "file": "/data/2026-05.json" }
   ]
 }
 ```
@@ -52,25 +41,30 @@ Lists which months are available. The app loads this first.
 
 ## A month file — `<YYYY-MM>.json`
 
-Every fund's holdings for one month.
+Every fund house's schemes for one month, in one file. Each `fund` is one scheme.
 
 ```json
 {
   "month": "2026-05",
-  "source": "AdvisorKhoj (EXAMPLE placeholder data — made-up numbers, not real holdings)",
+  "source": "AdvisorKhoj → fund-house monthly portfolio disclosures (official .xlsx). Values converted from lakhs to plain rupees.",
+  "generatedAt": "2026-08-10T17:57:00.000Z",
+  "coverage": [
+    { "fundHouse": "Axis Mutual Fund", "amcSlug": "Axis-Mutual-Fund", "status": "ok", "schemes": 67, "holdings": 4441 },
+    { "fundHouse": "HDFC Mutual Fund", "amcSlug": "HDFC-Mutual-Fund", "status": "walled", "schemes": 0, "holdings": 0, "reason": "walled (no scrape.do key)" }
+  ],
   "funds": [
     {
-      "fundId": "example-bluechip-fund",
-      "fundName": "Example Bluechip Equity Fund",
-      "fundHouse": "Example Asset Management",
+      "fundId": "Axis-Mutual-Fund:AXIS500",
+      "fundName": "Axis Nifty 500 Index Fund",
+      "fundHouse": "Axis Mutual Fund",
       "holdings": [
         {
-          "isin": "INE001A01036",
-          "stockName": "Bharat Digital Services Ltd",
-          "shares": 1200000,
-          "marketValueInr": 1523400000,
-          "portfolioPercent": 8.42,
-          "sector": "Information Technology"
+          "isin": "INE040A01034",
+          "stockName": "HDFC Bank Limited",
+          "shares": 236732,
+          "marketValueInr": 176258810,
+          "portfolioPercent": 5.87,
+          "sector": "Banks"
         }
       ]
     }
@@ -80,50 +74,62 @@ Every fund's holdings for one month.
 
 ### Month object
 
-| Field    | Type     | Notes                                            |
-| -------- | -------- | ------------------------------------------------ |
-| `month`  | `string` | `"YYYY-MM"`; must match the index entry.         |
-| `source` | `string` | Provenance — where the numbers came from.        |
-| `funds`  | array    | One entry per fund reporting this month.         |
+| Field         | Type              | Notes                                                       |
+| ------------- | ----------------- | ----------------------------------------------------------- |
+| `month`       | `string`          | `"YYYY-MM"`; matches the index entry.                       |
+| `source`      | `string`          | Provenance.                                                 |
+| `generatedAt` | `string?`         | ISO timestamp of the ingestion run. Optional.               |
+| `coverage`    | `AmcCoverage[]?`  | Per-fund-house outcome for this month (records gaps). Optional. |
+| `funds`       | `FundHoldings[]`  | Every scheme that was successfully ingested.                |
+
+### Coverage entry — how gaps are recorded (Rule 5)
+
+A run never invents zeros for a fund house it couldn't fetch. Instead each house
+gets a `coverage` row:
+
+| `status`   | Meaning                                                              |
+| ---------- | ------------------------------------------------------------------- |
+| `ok`       | Downloaded and parsed this run.                                     |
+| `walled`   | Blocked by a bot-wall; needs a scrape.do key. Data is a gap.        |
+| `failed`   | Link found but the download/parse failed. Data is a gap.            |
+| `missing`  | No disclosure link listed for this month. Data is a gap.            |
+| `retained` | This run couldn't fetch it, so previously-good data was kept.       |
 
 ### Fund object
 
 | Field       | Type     | Notes                                                          |
 | ----------- | -------- | -------------------------------------------------------------- |
-| `fundId`    | `string` | Stable slug identifying the fund **across months** (the join key for funds). |
+| `fundId`    | `string` | Stable id `"<AMC-Slug>:<schemeCode>"` — the join key for funds across months. |
 | `fundName`  | `string` | Display name of the scheme.                                    |
-| `fundHouse` | `string` | The AMC / fund house.                                          |
+| `fundHouse` | `string` | The AMC / fund house (used to roll schemes up later).          |
 | `holdings`  | array    | The stock positions held this month.                           |
 
 ### Holding object
 
 | Field              | Type             | Notes                                                        |
 | ------------------ | ---------------- | ------------------------------------------------------------ |
-| `isin`             | `string`         | **Canonical stock identifier (Rule 4).** Join stocks on this, never on name. |
+| `isin`             | `string`         | **Canonical stock identifier (Rule 4).** `INE` + 9 chars.    |
 | `stockName`        | `string`         | Display only. Spelling varies across sources.                |
 | `shares`           | `number \| null` | Whole share count. `null` when not disclosed.                |
-| `marketValueInr`   | `number \| null` | **Plain whole rupees (Rule 3)** — not lakhs/crores. `null` when not disclosed. |
+| `marketValueInr`   | `number \| null` | **Plain whole rupees (Rule 3)** — the source lakhs value × 100000. `null` when not disclosed. |
 | `portfolioPercent` | `number \| null` | Percent of the fund's portfolio, `0`–`100`. `null` when not disclosed. |
 | `sector`           | `string \| null` | Sector/industry. `null` when not disclosed.                  |
 
-## Conventions baked into the format
+## How the source .xlsx maps to this format
 
-- **Unknown → `null`, never `0` (Rule 2).** Any field that wasn't disclosed is
-  `null` and renders as `—` in the UI. A `0` means a real, disclosed zero.
-- **Money is plain rupees (Rule 3).** `marketValueInr` is a whole number of
-  rupees. Example: `1523400000` is ₹152.34 crore. Formatting to crores/lakhs
-  happens only at display time (`formatInr`).
-- **ISIN is the identity (Rule 4).** The same company can appear under slightly
-  different `stockName`s in different files; only `isin` is reliable for matching
-  a stock month-over-month and across funds.
-- **`fundId` is the fund identity.** Use it (not `fundName`) to track a fund
-  across months.
+Each fund house publishes one workbook per month with **one sheet per scheme**.
+SEBI fixes the columns but not their position, so the ingestion:
 
-## Example data in this repo
+1. Finds the header row by locating the column whose header contains **"ISIN"**,
+   then reads the other columns off that same row: *Name of the Instrument*,
+   *Quantity*, *Market/Fair Value*, *% to Net Assets*, and *Industry*.
+2. Keeps only rows whose ISIN matches `INE` + 9 characters (skips subtotals,
+   section headers, and non-`INE` instruments).
+3. **Market value is in lakhs** in the file → multiplied by 100000 to store plain
+   rupees. Empty/`NIL` cells become `null`, never `0`.
+4. **% to Net Assets** is read honouring the cell's number format: some houses
+   store an Excel fraction (`0.0587` shown as `5.87%`), others the plain number
+   `5.87`. The value always lands in `0`–`100`.
 
-`2026-05.json` and `2026-06.json` are **fictional** — made-up funds, stocks, and
-numbers — so the app has something to load in this setup step. Between the two
-months the examples deliberately include a buy (more shares), a sell (fewer
-shares), an exit (a holding that disappears), a new position, and one `null`
-`sector`, so later steps have realistic month-over-month changes and a missing
-value to render as `—`.
+See [`scripts/ingest.ts`](../scripts/ingest.ts) and the "Data ingestion" section
+of [`CLAUDE.md`](../CLAUDE.md).

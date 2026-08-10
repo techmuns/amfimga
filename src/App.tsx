@@ -78,7 +78,7 @@ export function App() {
 function Header() {
   return (
     <header className="border-b border-slate-200 dark:border-slate-800">
-      <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex w-full max-w-3xl items-center px-6 py-4">
         <div className="flex items-center gap-2.5">
           <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
             A
@@ -90,31 +90,8 @@ function Header() {
             </div>
           </div>
         </div>
-        <LogoutButton />
       </div>
     </header>
-  );
-}
-
-function LogoutButton() {
-  const [busy, setBusy] = useState(false);
-  async function logout() {
-    setBusy(true);
-    try {
-      await fetch("/api/logout", { method: "POST" });
-    } finally {
-      window.location.replace("/");
-    }
-  }
-  return (
-    <button
-      type="button"
-      onClick={logout}
-      disabled={busy}
-      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-    >
-      {busy ? "Signing out…" : "Sign out"}
-    </button>
   );
 }
 

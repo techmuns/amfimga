@@ -7,16 +7,9 @@
     // The Worker (worker/index.ts) reads assets through this binding.
     "binding": "ASSETS",
     // Serve index.html for unknown client-side routes (single-page app).
-    "not_found_handling": "single-page-application",
-    // Run the Worker BEFORE serving any static asset, so the password gate
-    // protects everything — including the /data/*.json files (Rule 5).
-    "run_worker_first": true
+    "not_found_handling": "single-page-application"
   },
   "observability": {
     "enabled": true
   }
-  // Secrets are NOT stored here. Set them per environment:
-  //   npx wrangler secret put APP_PASSWORD
-  //   npx wrangler secret put SESSION_SECRET
-  // For local dev they come from .dev.vars (see .dev.vars.example).
 }
