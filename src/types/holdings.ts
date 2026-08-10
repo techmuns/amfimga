@@ -104,3 +104,101 @@ export interface DataIndex {
   /** Available months, sorted oldest → newest. */
   months: MonthIndexEntry[];
 }
+
+// ===========================================================================
+// Derived summaries (Step 3)
+//
+// These are the SMALL files the browser actually loads. They are computed from
+// the raw month files by `scripts/derive.ts`. The raw months are NOT served.
+//
+// Coverage-awareness (the core rule): a change is only computed from funds/
+// houses present in BOTH months compared. A missing house is a gap → the change
+// is `null` (unknown), never treated as a sell-to-zero.
+// ===========================================================================
+
+/** `public/data/summary.json` — which months exist and how complete each is. */
+export interface SummaryMeta {
+  schemaVersion: number;
+  generatedAt: string;
+  months: MonthMeta[];
+}
+
+export interface MonthMeta {
+  month: string; // "YYYY-MM"
+  label: string; // "May 2026"
+  /** Fund houses we actually have data for this month. */
+  housesPresent: number;
+  /** Fund houses AdvisorKhoj listed (attempted) — the "Y" in "X of Y houses". */
+  housesTotal: number;
+  /** Schemes (funds) present this month. */
+  fundCount: number;
+  /** Distinct stocks (ISINs) present this month. */
+  stockCount: number;
+}
+
+/** `public/data/stocks.json` — the compact all-stocks table. Arrays align to `months`. */
+export interface StocksSummary {
+  schemaVersion: number;
+  months: string[];
+  monthLabels: string[];
+  stocks: StockRow[];
+}
+
+export interface StockRow {
+  isin: string;
+  name: string;
+  sector: string | null;
+  /** Large/mid/small — left null until the AMFI list is added in a later step. */
+  marketCap: null;
+  /** Per-month total shares across all present funds. `null` = not held / unknown. */
+  totalShares: (number | null)[];
+  /** Per-month total market value in plain rupees. `null` = not held / unknown. */
+  totalValueInr: (number | null)[];
+  /** Per-month count of funds holding it. `null` = not held that month. */
+  fundCount: (number | null)[];
+  /** Per-month net share change vs the previous month. `null` = no prior month or a coverage gap. */
+  netShareChange: (number | null)[];
+}
+
+/** `public/data/stocks/<ISIN>.json` — per-stock detail, loaded on demand. */
+export interface StockDetail {
+  schemaVersion: number;
+  isin: string;
+  name: string;
+  sector: string | null;
+  marketCap: null;
+  months: string[];
+  monthLabels: string[];
+  totalShares: (number | null)[];
+  totalValueInr: (number | null)[];
+  fundCount: (number | null)[];
+  netShareChange: (number | null)[];
+  /** The funds that hold (or held) this stock, with each fund's own trend. */
+  funds: FundTrend[];
+}
+
+export interface FundTrend {
+  fundId: string;
+  fundName: string;
+  fundHouse: string;
+  /** Per-month shares. `null` = that fund's house wasn't covered that month (unknown), or shares undisclosed. */
+  shares: (number | null)[];
+  /** Per-month share change vs previous month. `null` = unknown (coverage gap). */
+  change: (number | null)[];
+  /** Per-month event: a `new` position or an `exit`, else `null`. */
+  event: (("new" | "exit") | null)[];
+}
+
+/** `public/data/sectors.json` — net share-change summed by sector, per month. */
+export interface SectorSummary {
+  schemaVersion: number;
+  months: string[];
+  monthLabels: string[];
+  sectors: SectorRow[];
+}
+
+export interface SectorRow {
+  sector: string;
+  /** Per-month net share change across the sector. `null` = no prior month / all unknown. */
+  netShareChange: (number | null)[];
+}

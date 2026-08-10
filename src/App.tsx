@@ -1,21 +1,21 @@
-import { useEffect, useState } from "react";
-import type { DataIndex } from "./types/holdings";
-import { loadIndex } from "./lib/data";
-import { DASH } from "./lib/format";
+import { useEffect, useMemo, useState } from "react";
+import type { MonthMeta, StockRow, StocksSummary, SummaryMeta } from "./types/holdings";
+import { loadStocks, loadSummary } from "./lib/data";
+import { DASH, formatSignedCount } from "./lib/format";
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; reason: string }
-  | { status: "ready"; index: DataIndex };
+  | { status: "ready"; summary: SummaryMeta; stocks: StocksSummary };
 
 export function App() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
-    loadIndex()
-      .then((index) => {
-        if (!cancelled) setState({ status: "ready", index });
+    Promise.all([loadSummary(), loadStocks()])
+      .then(([summary, stocks]) => {
+        if (!cancelled) setState({ status: "ready", summary, stocks });
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -33,44 +33,111 @@ export function App() {
   return (
     <div className="flex min-h-dvh flex-col">
       <Header />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 sm:py-16">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 sm:py-14">
         <p className="text-sm font-medium tracking-wide text-indigo-600 dark:text-indigo-400">
-          Step 1 · Project setup
+          Step 3 · Buy/sell signals
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-          Mutual Fund Holdings Tracker
+          Where the funds are moving
         </h1>
+        <p className="mt-3 max-w-2xl text-slate-600 dark:text-slate-300">
+          Net change in shares held across India's mutual funds, month over month.
+          Positive means funds are net <strong>buying</strong>; negative means net{" "}
+          <strong>selling</strong>. Changes only compare funds present in both
+          months — a fund house missing from a month is shown as {DASH}, never
+          counted as a seller.
+        </p>
 
-        <MonthsSummary state={state} />
-
-        <section className="mt-8 space-y-4 text-slate-600 dark:text-slate-300">
-          <p>
-            Every month, India's mutual funds publicly disclose which stocks they
-            hold and how many shares. This dashboard will line those disclosures up
-            month&#8209;over&#8209;month across the whole market — all fund houses,
-            all stocks — so you can see where the &ldquo;smart money&rdquo; is
-            quietly moving in or out, and surface investment ideas from the shifts.
-          </p>
-          <p>
-            Data comes from AdvisorKhoj&apos;s links to each fund house&apos;s
-            official monthly holdings files. Stocks are matched by their{" "}
-            <abbr
-              title="International Securities Identification Number — a stable unique ID like INE040A01034"
-              className="cursor-help font-medium text-slate-700 no-underline dark:text-slate-200"
-            >
-              ISIN
-            </abbr>{" "}
-            code rather than by name, so inconsistent spellings never split one
-            company into several.
-          </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            This first step is scaffolding only: the page below just confirms it can
-            load month files at runtime. Downloading real data, the buy/sell
-            analysis, and the dashboard screens come in later steps.
-          </p>
-        </section>
+        {state.status === "loading" && <Note>Loading summaries…</Note>}
+        {state.status === "error" && (
+          <Note tone="error">Couldn&apos;t load the data: {state.reason}</Note>
+        )}
+        {state.status === "ready" && (
+          <Movers summary={state.summary} stocks={state.stocks} />
+        )}
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function Movers({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummary }) {
+  const last = stocks.months.length - 1;
+  const meta: MonthMeta | undefined = summary.months[summary.months.length - 1];
+
+  const { buys, sells } = useMemo(() => {
+    const withChange = stocks.stocks
+      .map((s) => ({ s, net: s.netShareChange[last] }))
+      .filter((x): x is { s: StockRow; net: number } => x.net != null && x.net !== 0);
+    const buys = [...withChange].sort((a, b) => b.net - a.net).slice(0, 10);
+    const sells = [...withChange].sort((a, b) => a.net - b.net).slice(0, 10);
+    return { buys, sells };
+  }, [stocks, last]);
+
+  if (!meta) return <Note>No months available yet.</Note>;
+
+  return (
+    <section className="mt-8">
+      <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+        <span className="font-semibold">{meta.label}</span>
+        <span className="text-slate-500 dark:text-slate-400">
+          {" "}· based on <strong>{meta.housesPresent}</strong> of {meta.housesTotal}{" "}
+          fund houses · {meta.stockCount.toLocaleString("en-IN")} stocks ·{" "}
+          {meta.fundCount} funds
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-6 sm:grid-cols-2">
+        <MoverList
+          title="Top 10 net buys"
+          accent="text-emerald-600 dark:text-emerald-400"
+          rows={buys}
+        />
+        <MoverList
+          title="Top 10 net sells"
+          accent="text-rose-600 dark:text-rose-400"
+          rows={sells}
+        />
+      </div>
+
+      <p className="mt-6 text-xs text-slate-400 dark:text-slate-500">
+        Net share change vs the previous month, summed across funds present in both
+        months. Full sortable tables and per-stock detail come next.
+      </p>
+    </section>
+  );
+}
+
+function MoverList({
+  title,
+  accent,
+  rows,
+}: {
+  title: string;
+  accent: string;
+  rows: { s: StockRow; net: number }[];
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 className="text-sm font-semibold">{title}</h2>
+      <ol className="mt-3 space-y-2">
+        {rows.length === 0 && (
+          <li className="text-sm text-slate-400">Nothing comparable this month.</li>
+        )}
+        {rows.map(({ s, net }) => (
+          <li key={s.isin} className="flex items-baseline justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">{s.name}</div>
+              <div className="truncate text-xs text-slate-500 dark:text-slate-400">
+                {s.sector ?? DASH}
+              </div>
+            </div>
+            <div className={`shrink-0 font-mono text-sm tabular-nums ${accent}`}>
+              {formatSignedCount(net)}
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -78,7 +145,7 @@ export function App() {
 function Header() {
   return (
     <header className="border-b border-slate-200 dark:border-slate-800">
-      <div className="mx-auto flex w-full max-w-3xl items-center px-6 py-4">
+      <div className="mx-auto flex w-full max-w-4xl items-center px-6 py-4">
         <div className="flex items-center gap-2.5">
           <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
             A
@@ -95,68 +162,22 @@ function Header() {
   );
 }
 
-/** The one live thing this step proves: month files load at runtime (Rule 1). */
-function MonthsSummary({ state }: { state: LoadState }) {
+function Note({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "error";
+}) {
   return (
-    <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      {state.status === "loading" && (
-        <p className="text-slate-500 dark:text-slate-400">Loading month index…</p>
-      )}
-
-      {state.status === "error" && (
-        <div>
-          <p className="text-2xl font-semibold text-slate-400 dark:text-slate-500">
-            {/* Rule 2: never fake a number — show a dash with the reason. */}
-            {DASH} months loaded
-          </p>
-          <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">
-            Couldn&apos;t load the data index: {state.reason}
-          </p>
-        </div>
-      )}
-
-      {state.status === "ready" && <ReadySummary index={state.index} />}
-    </div>
-  );
-}
-
-function ReadySummary({ index }: { index: DataIndex }) {
-  const months = index.months;
-  const count = months.length;
-
-  if (count === 0) {
-    return (
-      <div>
-        <p className="text-2xl font-semibold text-slate-400 dark:text-slate-500">
-          {DASH} months loaded
-        </p>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          The index is empty — no month files are listed yet.
-        </p>
-      </div>
-    );
-  }
-
-  const first = months[0].label;
-  const last = months[count - 1].label;
-  const range = count === 1 ? first : `${first} – ${last}`;
-
-  return (
-    <div>
-      <p className="text-2xl font-semibold">
-        {count} {count === 1 ? "month" : "months"} loaded{" "}
-        <span className="text-slate-500 dark:text-slate-400">({range})</span>
-      </p>
-      <ul className="mt-4 flex flex-wrap gap-2">
-        {months.map((m) => (
-          <li
-            key={m.month}
-            className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-          >
-            {m.label}
-          </li>
-        ))}
-      </ul>
+    <div
+      className={`mt-8 rounded-2xl border p-6 ${
+        tone === "error"
+          ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300"
+          : "border-slate-200 bg-white text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+      }`}
+    >
+      {children}
     </div>
   );
 }
@@ -164,8 +185,8 @@ function ReadySummary({ index }: { index: DataIndex }) {
 function Footer() {
   return (
     <footer className="border-t border-slate-200 dark:border-slate-800">
-      <div className="mx-auto w-full max-w-3xl px-6 py-4 text-xs text-slate-400 dark:text-slate-500">
-        Private tool · example placeholder data
+      <div className="mx-auto w-full max-w-4xl px-6 py-4 text-xs text-slate-400 dark:text-slate-500">
+        Data: AdvisorKhoj · official monthly disclosures
       </div>
     </footer>
   );

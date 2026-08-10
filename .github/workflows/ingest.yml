@@ -52,11 +52,16 @@ jobs:
             npm run ingest -- --latest --concurrency 4
           fi
 
+      - name: Derive browser summaries
+        run: npm run derive
+
       - name: Commit updated data
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/data
+          # Raw months (data/months) + small summaries (public/data). The bulky
+          # per-stock detail files are git-ignored; they are regenerated on deploy.
+          git add data/months public/data
           if git diff --cached --quiet; then
             echo "No data changes to commit."
           else

@@ -59,18 +59,19 @@ Per holding:
 | `sector`           | `string \| null` | Sector/industry. `null` = not disclosed.                     |
 
 Each fund carries `fundId` (stable id, `"<AMC-Slug>:<schemeCode>"`), `fundName`,
-and `fundHouse` (the AMC), so later steps can roll holdings up by fund house.
+and `fundHouse` (the AMC), so holdings can be rolled up by fund house.
 
-Files (served from the site root at runtime):
+**Two tiers of data:**
 
-- `public/data/index.json` — `{ schemaVersion, months: [{ month, label, file }] }`,
-  sorted oldest → newest. The app reads this first to learn which months exist.
-- `public/data/<YYYY-MM>.json` — `{ month, source, generatedAt?, coverage?,
-  funds: [{ fundId, fundName, fundHouse, holdings: [...] }] }`. `coverage` records
-  each fund house's ingestion outcome for that month (Rule 5).
+- **Raw months (NOT served)** — `data/months/<YYYY-MM>.json`: the full holdings,
+  `{ month, source, generatedAt?, coverage?, funds: [...] }`. `coverage` records
+  each fund house's ingestion outcome (Rule 5). These are big; the browser never
+  loads them. They live outside `public/` on purpose.
+- **Derived summaries (served, small)** — `public/data/…`: what the browser loads.
+  Produced from the raw months by `scripts/derive.ts`.
 
-Adding a month = run the ingestion (it drops a new `public/data/<YYYY-MM>.json`
-and rebuilds `index.json`). No app code change (Rule 1).
+Adding a month = `npm run ingest` (writes `data/months/…`) then `npm run derive`
+(rebuilds the summaries). No app code change (Rule 1).
 
 ## Data ingestion
 
@@ -90,8 +91,29 @@ disclosures and writes month files:
 - Args: `--latest` (default), `--month YYYY-MM`, `--year YYYY`, `--backfill`
   (2023–2026), `--amc <slug>`, `--concurrency N`, `--dry-run`.
 
-`.github/workflows/ingest.yml` runs `--latest` monthly (16th) and commits the
-result. Uses proxy-aware fetch locally (`undici`) and direct internet in CI.
+`.github/workflows/ingest.yml` runs `--latest` monthly (16th), then `derive`, and
+commits the result. Uses proxy-aware fetch locally (`undici`) and direct in CI.
+
+## Derived summaries
+
+`scripts/derive.ts` (`npm run derive`) turns the raw months into the small files
+the browser loads. Pure recomputation, no network. Served files (`public/data`):
+
+- `summary.json` — months + coverage counts (`housesPresent`/`housesTotal`).
+- `stocks.json` — compact all-stocks table: per stock, per month, its total
+  shares, total value (rupees), fund count, and net share change.
+- `sectors.json` — net share-change summed by sector, per month.
+- `stocks/<ISIN>.json` — per-stock fund-by-fund detail, loaded on demand.
+  (Git-ignored — bulky and reproducible; regenerated on deploy.)
+
+**Coverage-awareness (the core Step-3 rule).** A month-over-month change is only
+computed from funds whose fund HOUSE is present in BOTH months. If a house is a
+gap in either month, its funds' change is `null` (unknown) — a missing house is
+NEVER treated as a sell-to-zero. Each month records how many houses it is based
+on. So the per-month *total* shares can rise while the coverage-aware *net
+change* is negative (a house appearing is not buying).
+
+Market cap (large/mid/small) is left `null` until the AMFI list is added later.
 
 ## Tech stack
 
@@ -106,20 +128,25 @@ result. Uses proxy-aware fetch locally (`undici`) and direct internet in CI.
 
 ```
 worker/index.ts            Cloudflare Worker: static-asset pass-through (no auth)
-scripts/ingest.ts          Data ingestion (download + parse + write month files)
-.github/workflows/ingest.yml  Monthly automated ingestion
+scripts/ingest.ts          Ingestion: download + parse → data/months/<YYYY-MM>.json
+scripts/derive.ts          Derive: raw months → small summaries in public/data
+.github/workflows/ingest.yml  Monthly ingest + derive
+data/months/               Raw month files (NOT served; input to derive)
+  <YYYY-MM>.json           One month, all fund houses (produced by ingestion)
 src/
   main.tsx                 React entry
-  App.tsx                  The single home page (loads the index, shows months loaded)
+  App.tsx                  Home page: top net buys/sells + coverage
   index.css                Tailwind entry + base styles
-  types/holdings.ts        Data types (the format contract)
-  lib/data.ts              Runtime loaders: loadIndex(), loadMonth() — fetch, no imports
-  lib/format.ts            Display helpers: DASH, formatInr, formatPercent, formatCount
+  types/holdings.ts        Data types (raw + derived; the format contract)
+  lib/data.ts              Runtime loaders: loadSummary/loadStocks/loadSectors/loadStockDetail
+  lib/format.ts            Display helpers: DASH, formatInr, formatPercent, formatCount, formatSignedCount
 public/
   favicon.svg
-  data/
-    index.json             Which months exist
-    <YYYY-MM>.json         One month, all fund houses (produced by ingestion)
+  data/                    SERVED summaries only (small)
+    summary.json           Months + coverage counts
+    stocks.json            Compact all-stocks table
+    sectors.json           Net share-change by sector
+    stocks/<ISIN>.json     Per-stock detail (git-ignored; regenerated on deploy)
 docs/data-format.md        On-disk data format, in prose
 wrangler.jsonc             Worker + assets config
 ```
@@ -130,8 +157,10 @@ wrangler.jsonc             Worker + assets config
 npm run dev       # Vite dev server + Worker (Miniflare)
 npm run build     # tsc -b (type-check) + vite build → dist/
 npm run preview   # Serve the production build through the Worker locally
-npm run deploy    # build, then wrangler deploy
-npm run ingest -- --latest    # download + parse the latest full month
+npm run deploy    # derive, build, then wrangler deploy
+npm run ingest -- --latest    # download the latest full month → data/months/
+npm run derive                # rebuild the browser summaries from data/months/
+npm run data                  # ingest --latest, then derive
 ```
 
 ## Ingestion secrets
@@ -143,6 +172,6 @@ npm run ingest -- --latest    # download + parse the latest full month
 
 ## Scope discipline
 
-Build this project one step at a time. Steps 1–2 (setup, ingestion) are done. Do
-not build the analysis math or the dashboard screens until the step that calls
-for them. When in doubt, keep the five rules and the data shape above intact.
+Build this project one step at a time. Steps 1–3 (setup, ingestion, derived
+signals) are done. Do not build the full dashboard screens until the step that
+calls for them. When in doubt, keep the five rules and the data shape intact.

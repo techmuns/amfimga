@@ -8,9 +8,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run derive && npm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
-    "ingest": "tsx scripts/ingest.ts"
+    "ingest": "tsx scripts/ingest.ts",
+    "derive": "tsx scripts/derive.ts",
+    "data": "npm run ingest -- --latest && npm run derive"
   },
   "dependencies": {
     "react": "^19.2.8",

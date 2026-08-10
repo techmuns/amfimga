@@ -5,8 +5,8 @@
  * AdvisorKhoj links to (one .xlsx per fund house per month, hosted on each fund
  * house's own site), parses them, and writes one file per month in the project's
  * MonthData format (see src/types/holdings.ts). No app code changes are needed
- * to add a month — this script just drops files into public/data and rebuilds
- * the index (Rule 1).
+ * to add a month — this script drops a raw file into data/months, then
+ * `npm run derive` rebuilds the small browser summaries in public/data (Rule 1).
  *
  * Usage (via `npm run ingest -- <args>`):
  *   --latest            Ingest the most recent FULL (non-adhoc) month. Default.
@@ -41,7 +41,9 @@ import type {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
-const DATA_DIR = resolve(ROOT, "public/data");
+// Raw month files live OUTSIDE public/ so they are NOT served to the browser.
+// The derive step (scripts/derive.ts) turns them into small summaries in public/data.
+const MONTHS_DIR = resolve(ROOT, "data/months");
 
 loadDotEnv();
 configureProxy();
@@ -387,7 +389,7 @@ function mergeFunds(
 }
 
 function readMonth(month: string): MonthData | null {
-  const p = resolve(DATA_DIR, `${month}.json`);
+  const p = resolve(MONTHS_DIR, `${month}.json`);
   if (!existsSync(p)) return null;
   try {
     return JSON.parse(readFileSync(p, "utf8")) as MonthData;
@@ -396,17 +398,11 @@ function readMonth(month: string): MonthData | null {
   }
 }
 
-function rebuildIndex(): string[] {
-  const files = readdirSync(DATA_DIR).filter((f) => /^\d{4}-\d{2}\.json$/.test(f));
-  const months = files
+function listMonths(): string[] {
+  return readdirSync(MONTHS_DIR)
+    .filter((f) => /^\d{4}-\d{2}\.json$/.test(f))
     .map((f) => f.replace(/\.json$/, ""))
-    .sort()
-    .map((month) => ({ month, label: monthLabel(month), file: `/data/${month}.json` }));
-  writeFileSync(
-    resolve(DATA_DIR, "index.json"),
-    JSON.stringify({ schemaVersion: 1, months }, null, 2) + "\n",
-  );
-  return months.map((m) => m.month);
+    .sort();
 }
 
 // ---------------------------------------------------------------------------
@@ -538,9 +534,8 @@ async function ingestMonth(month: string, amcs: Amc[], args: Args): Promise<void
     console.log("  (dry-run: not writing)");
     return;
   }
-  mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(resolve(DATA_DIR, `${month}.json`), JSON.stringify(out, null, 2) + "\n");
-  rebuildIndex();
+  mkdirSync(MONTHS_DIR, { recursive: true });
+  writeFileSync(resolve(MONTHS_DIR, `${month}.json`), JSON.stringify(out, null, 2) + "\n");
 }
 
 /** Determine which months to ingest based on args. */
@@ -594,10 +589,8 @@ async function main() {
     await ingestMonth(month, amcs, args);
   }
 
-  const have = args.dryRun
-    ? readdirSync(DATA_DIR).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).map((f) => f.replace(/\.json$/, "")).sort()
-    : rebuildIndex();
-  console.log(`\nDone. Month files present: ${have.join(", ") || "(none)"}`);
+  console.log(`\nDone. Raw month files present: ${listMonths().join(", ") || "(none)"}`);
+  if (!args.dryRun) console.log("Next: run `npm run derive` to rebuild the browser summaries.");
 }
 
 // ---------------------------------------------------------------------------

@@ -4,23 +4,33 @@ How each month's fund-holdings data is stored on disk. The TypeScript types in
 [`src/types/holdings.ts`](../src/types/holdings.ts) are the authoritative source;
 this document explains the format and the decisions behind it.
 
-## Where the files live and how they load
+## Two tiers: raw months vs served summaries
 
-All data is plain JSON under `public/data/`. Vite copies `public/` verbatim into
-the build, so at runtime the files are served from the site root:
+There are two kinds of data file:
 
 ```
-public/data/index.json      ->  /data/index.json
-public/data/2026-05.json    ->  /data/2026-05.json
+data/months/<YYYY-MM>.json    RAW — full holdings. NOT served to the browser.
+                              Produced by `npm run ingest`. Input to derive.
+public/data/summary.json      SERVED — months + coverage counts.
+public/data/stocks.json       SERVED — compact all-stocks table.
+public/data/sectors.json      SERVED — net share-change by sector.
+public/data/stocks/<ISIN>.json SERVED — per-stock detail, loaded on demand.
 ```
 
-The app **fetches** these at runtime (`src/lib/data.ts`); it never imports them.
-This is Rule 1 — the data changes monthly, the code does not. Month files are
-produced by the ingestion script (see below), which also rebuilds the index.
+The browser only ever loads the small **served summaries** (`src/lib/data.ts`,
+Rule 1 — fetched, never imported). The **raw months** are big and live outside
+`public/`, so they are never sent to the browser. `npm run derive` turns raw
+months into the summaries. The rest of this document describes the raw month
+format (the ingestion output); the derived summary shapes are in
+[`src/types/holdings.ts`](../src/types/holdings.ts) (`SummaryMeta`,
+`StocksSummary`, `StockDetail`, `SectorSummary`), and the coverage-aware rules
+behind them are in [`CLAUDE.md`](../CLAUDE.md).
 
-## The index file — `index.json`
+Historical note: earlier steps served a `public/data/index.json` and the raw
+months directly. As of Step 3 the raw months moved to `data/months/` (not served)
+and the browser loads `summary.json` instead.
 
-Lists which months are available. The app loads this first.
+<details><summary>Legacy index shape (no longer served)</summary>
 
 ```json
 {
@@ -39,9 +49,12 @@ Lists which months are available. The app loads this first.
 | `months[].label`| `string` | Human label, e.g. `"May 2026"`.                           |
 | `months[].file` | `string` | Absolute path (from site root) to the month's data file.  |
 
-## A month file — `<YYYY-MM>.json`
+</details>
+
+## A month file — `data/months/<YYYY-MM>.json`
 
 Every fund house's schemes for one month, in one file. Each `fund` is one scheme.
+This is the raw ingestion output (not served to the browser).
 
 ```json
 {

@@ -34,3 +34,13 @@ export function formatCount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return DASH;
   return value.toLocaleString("en-IN");
 }
+
+/**
+ * Format a signed share-change, e.g. 1200000 → "+12,00,000", -34500 → "−34,500".
+ * Returns {@link DASH} for null/unknown — a coverage gap is never shown as 0.
+ */
+export function formatSignedCount(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return DASH;
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}${Math.abs(value).toLocaleString("en-IN")}`;
+}

@@ -1,29 +1,36 @@
-import type { DataIndex, MonthData } from "../types/holdings";
+import type {
+  SummaryMeta,
+  StocksSummary,
+  StockDetail,
+  SectorSummary,
+} from "../types/holdings";
 
 /**
  * Runtime data loading (Rule 1).
  *
- * The site NEVER bundles holdings data into the JS. Everything is fetched at
- * runtime from static files under /data, so the monthly data can be replaced
- * by dropping in new files — no rebuild, no redeploy of code.
+ * The browser only ever loads the SMALL derived summaries under /data — never
+ * the big raw month files (those live outside public/, in data/months/). The
+ * summaries are produced by `scripts/derive.ts`.
  */
 
-const INDEX_URL = "/data/index.json";
-
-/** Load the index of available months. */
-export async function loadIndex(): Promise<DataIndex> {
-  const res = await fetch(INDEX_URL, { headers: { accept: "application/json" } });
-  if (!res.ok) {
-    throw new Error(`Could not load the data index (HTTP ${res.status}).`);
-  }
-  return (await res.json()) as DataIndex;
+async function getJson<T>(url: string, what: string): Promise<T> {
+  const res = await fetch(url, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`Could not load ${what} (HTTP ${res.status}).`);
+  return (await res.json()) as T;
 }
 
-/** Load a single month's data file, given its path from the index. */
-export async function loadMonth(file: string): Promise<MonthData> {
-  const res = await fetch(file, { headers: { accept: "application/json" } });
-  if (!res.ok) {
-    throw new Error(`Could not load month file "${file}" (HTTP ${res.status}).`);
-  }
-  return (await res.json()) as MonthData;
-}
+/** Which months exist and how complete each is ("X of Y houses"). */
+export const loadSummary = (): Promise<SummaryMeta> =>
+  getJson("/data/summary.json", "the summary");
+
+/** The compact all-stocks table for the main view. */
+export const loadStocks = (): Promise<StocksSummary> =>
+  getJson("/data/stocks.json", "the stocks table");
+
+/** Net share-change by sector, per month. */
+export const loadSectors = (): Promise<SectorSummary> =>
+  getJson("/data/sectors.json", "the sector summary");
+
+/** One stock's fund-by-fund detail, loaded on demand. */
+export const loadStockDetail = (isin: string): Promise<StockDetail> =>
+  getJson(`/data/stocks/${encodeURIComponent(isin)}.json`, `details for ${isin}`);
