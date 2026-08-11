@@ -8,9 +8,11 @@ name: Monthly data ingestion
 # is committed as it finishes, so a re-run continues where a timed-out run left
 # off. Logs print counts/statuses only — never security names, money, or keys.
 
+# NOTE: the scheduled monthly refresh now comes from sync-amfibeas.yml, which
+# pulls full ~50-house coverage (incl. HDFC/ICICI) from the AMFIBEAS dataset with
+# no secret keys. This AdvisorKhoj scraper is kept as an independent, on-demand
+# source (the ~23 houses AdvisorKhoj links directly) — run it by hand when needed.
 on:
-  schedule:
-    - cron: "0 6 16 * *" # 06:00 UTC on the 16th
   workflow_dispatch:
     inputs:
       months_back:

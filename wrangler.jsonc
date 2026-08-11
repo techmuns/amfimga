@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "amfimga",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    // The Worker (worker/index.ts) reads assets through this binding.
+    "binding": "ASSETS",
+    // Serve index.html for unknown client-side routes (single-page app).
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-11T07:35:21.780Z",
+  "topSectors": [
+    "Financial Services",
+    "Consumer Discretionary",
+    "Industrials",
+    "Healthcare",
+    "Materials",
+    "Information Technology",
+    "Energy",
+    "Consumer Staples"
+  ],
+  "months": [
+    {
+      "month": "2025-01",
+      "label": "January 2025",
+      "housesPresent": 12,
+      "housesTotal": 50,
+      "fundCount": 317,
+      "stockCount": 997
+    },
+    {
+      "month": "2025-02",
+      "label": "February 2025",
+      "housesPresent": 11,
+      "housesTotal": 50,
+      "fundCount": 256,
+      "stockCount": 1004
+    },
+    {
+      "month": "2025-03",
+      "label": "March 2025",
+      "housesPresent": 13,
+      "housesTotal": 50,
+      "fundCount": 331,
+      "stockCount": 853
+    },
+    {
+      "month": "2025-04",
+      "label": "April 2025",
+      "housesPresent": 13,
+      "housesTotal": 50,
+      "fundCount": 325,
+      "stockCount": 998
+    },
+    {
+      "month": "2025-05",
+      "label": "May 2025",
+      "housesPresent": 13,
+      "housesTotal": 50,
+      "fundCount": 328,
+      "stockCount": 989
+    },
+    {
+      "month": "2025-06",
+      "label": "June 2025",
+      "housesPresent": 13,
+      "housesTotal": 50,
+      "fundCount": 331,
+      "stockCount": 1122
+    },
+    {
+      "month": "2025-07",
+      "label": "July 2025",
+      "housesPresent": 13,
+      "housesTotal": 50,
+      "fundCount": 337,
+      "stockCount": 1133
+    },
+    {
+      "month": "2025-08",
+      "label": "August 2025",
+      "housesPresent": 14,
+      "housesTotal": 50,
+      "fundCount": 345,
+      "stockCount": 1138
+    },
+    {
+      "month": "2025-09",
+      "label": "September 2025",
+      "housesPresent": 14,
+      "housesTotal": 50,
+      "fundCount": 349,
+      "stockCount": 1167
+    },
+    {
+      "month": "2025-10",
+      "label": "October 2025",
+      "housesPresent": 13,
+      "housesTotal": 50,
+      "fundCount": 343,
+      "stockCount": 1170
+    },
+    {
+      "month": "2025-11",
+      "label": "November 2025",
+      "housesPresent": 12,
+      "housesTotal": 50,
+      "fundCount": 272,
+      "stockCount": 827
+    },
+    {
+      "month": "2025-12",
+      "label": "December 2025",
+      "housesPresent": 18,
+      "housesTotal": 50,
+      "fundCount": 466,
+      "stockCount": 1178
+    },
+    {
+      "month": "2026-01",
+      "label": "January 2026",
+      "housesPresent": 20,
+      "housesTotal": 50,
+      "fundCount": 507,
+      "stockCount": 1186
+    },
+    {
+      "month": "2026-02",
+      "label": "February 2026",
+      "housesPresent": 20,
+      "housesTotal": 50,
+      "fundCount": 503,
+      "stockCount": 1188
+    },
+    {
+      "month": "2026-03",
+      "label": "March 2026",
+      "housesPresent": 21,
+      "housesTotal": 50,
+      "fundCount": 461,
+      "stockCount": 1180
+    },
+    {
+      "month": "2026-04",
+      "label": "April 2026",
+      "housesPresent": 21,
+      "housesTotal": 50,
+      "fundCount": 535,
+      "stockCount": 1187
+    },
+    {
+      "month": "2026-05",
+      "label": "May 2026",
+      "housesPresent": 23,
+      "housesTotal": 50,
+      "fundCount": 571,
+      "stockCount": 1029
+    },
+    {
+      "month": "2026-06",
+      "label": "June 2026",
+      "housesPresent": 22,
+      "housesTotal": 50,
+      "fundCount": 519,
+      "stockCount": 1010
+    },
+    {
+      "month": "2026-07",
+      "label": "July 2026",
+      "housesPresent": 33,
+      "housesTotal": 50,
+      "fundCount": 1131,
+      "stockCount": 1269
+    }
+  ]
+}

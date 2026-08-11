@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Design system — the ONLY colors, font, and sizes in the app.
+   Light is primary; dark is an explicit toggle (data-theme="dark"), not an
+   auto-invert.
+   ========================================================================== */
+
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --buy: #0ca30c;
+  --sell: #d03b3b;
+  --flat: #f0efec;
+
+  /* Sector colors — fixed order, never cycle, never recolor. 9th+ → Other. */
+  --sector-1: #2a78d6;
+  --sector-2: #eb6834;
+  --sector-3: #1baf7a;
+  --sector-4: #eda100;
+  --sector-5: #e87ba4;
+  --sector-6: #008300;
+  --sector-7: #4a3aa7;
+  --sector-8: #e34948;
+  --sector-other: #898781;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.12);
+  --buy: #0ca30c;
+  --sell: #d03b3b;
+  --flat: #26261f;
+
+  --sector-1: #3987e5;
+  --sector-2: #d95926;
+  --sector-3: #199e70;
+  --sector-4: #c98500;
+  --sector-5: #d55181;
+  --sector-6: #008300;
+  --sector-7: #9085e9;
+  --sector-8: #e66767;
+  --sector-other: #898781;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums; /* all numbers align */
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* The only type sizes in the app. */
+  .t-title { font-size: 26px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
+  .t-section { font-size: 15px; font-weight: 600; }
+  .t-label { font-size: 13px; font-weight: 600; }
+  .t-body { font-size: 13px; font-weight: 400; }
+  .t-muted { font-size: 12px; font-weight: 400; color: var(--muted); }
+
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Chart marks. Thin bars, rounded on the value end only. */
+  .bar-buy { background: var(--buy); border-radius: 0 4px 4px 0; }
+  .bar-sell { background: var(--sell); border-radius: 4px 0 0 4px; }
+
+  /* Table grid — shared by header and rows so columns line up. */
+  .stock-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 2fr) 148px 76px 132px 176px 64px;
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  /* Funds table on the stock detail page. */
+  .fund-grid {
+    display: grid;
+    grid-template-columns: minmax(200px, 2fr) 120px 150px 84px 76px 96px;
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  /* Holdings table on the per-fund page: Stock · Sector · Shares · % · Change · Trend. */
+  .hold-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 2fr) 140px 118px 96px 128px 64px;
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  .badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .link {
+    color: var(--ink-2);
+    cursor: pointer;
+    background: none;
+    border: 0;
+    font: inherit;
+    padding: 0;
+  }
+  .link:hover { color: var(--ink); text-decoration: underline; }
+
+  /* market-cap label */
+  .cap-pill {
+    font-size: 11px; font-weight: 600; color: var(--ink-2);
+    border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; white-space: nowrap;
+  }
+  .cap-none { font-size: 11px; color: var(--muted); }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  /* ---- tooltip ---- */
+  .tooltip {
+    position: fixed;
+    z-index: 50;
+    max-width: 260px;
+    pointer-events: none;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.35;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+  }
+  .tooltip .k { color: var(--muted); }
+
+  /* ---- diverging bars (moves + sectors) ---- */
+  .div-chart { display: flex; flex-direction: column; gap: 3px; }
+  .div-row {
+    display: grid;
+    grid-template-columns: 168px 1fr 1fr;
+    align-items: center;
+    column-gap: 8px;
+    height: 19px;
+    cursor: default;
+  }
+  .div-row:hover { background: var(--flat); }
+  .div-label {
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--ink);
+  }
+  .div-half { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .div-half.left { justify-content: flex-end; border-right: 1px solid var(--axis); padding-right: 8px; }
+  .div-half.right { justify-content: flex-start; padding-left: 8px; }
+  .div-bar { height: 11px; display: block; }
+  .div-val { font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .val-buy { color: var(--buy); }
+  .val-sell { color: var(--sell); }
+
+  /* ---- sparkline ---- */
+  .spark .spark-dot { opacity: 0; }
+  .spark:hover .spark-dot { opacity: 1; }
+
+  /* ---- sector chips ---- */
+  .sec-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex: none; }
+  .fchip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 10px; font-size: 12px; font-weight: 600;
+    color: var(--ink-2); background: transparent; cursor: pointer;
+  }
+  .fchip[data-active="true"] { color: #fff; border-color: transparent; }
+  .fchip[data-active="true"] .sec-dot { background: rgba(255, 255, 255, 0.9) !important; }
+
+  /* ---- table ---- */
+  .stock-head { border-bottom: 1px solid var(--border); }
+  .th {
+    font-size: 13px; font-weight: 600; color: var(--ink-2);
+    cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .th .arrow { color: var(--muted); font-size: 10px; }
+  .stock-row { border-bottom: 1px solid var(--border); }
+  .stock-row:hover { background: var(--flat); }
+  .cell-r { text-align: right; justify-self: end; }
+  .mag { height: 3px; border-radius: 2px; margin-top: 3px; }
+
+  /* ---- buttons / inputs ---- */
+  .theme-btn, .searchbox {
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+    border-radius: 8px; font-size: 13px;
+  }
+  .theme-btn { padding: 5px 10px; cursor: pointer; font-weight: 600; }
+  .searchbox { padding: 6px 10px; }
+  .searchbox::placeholder { color: var(--muted); }
+}
