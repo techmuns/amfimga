@@ -1,0 +1,80 @@
+name: Monthly data ingestion
+
+# Pulls monthly fund-holdings disclosures and commits the derived data.
+#  - Scheduled (16th): fetch the latest full month.
+#  - Manual "backfill": set months_back to pull the last N months across every
+#    fund house, using the scrape.do / firecrawl secrets for bot-walled houses.
+# Resumable: already-downloaded (house, month) pairs are skipped, and each month
+# is committed as it finishes, so a re-run continues where a timed-out run left
+# off. Logs print counts/statuses only — never security names, money, or keys.
+
+on:
+  schedule:
+    - cron: "0 6 16 * *" # 06:00 UTC on the 16th
+  workflow_dispatch:
+    inputs:
+      months_back:
+        description: 'Backfill the last N months across all fund houses (blank = latest month only)'
+        required: false
+        default: "18"
+      month:
+        description: 'Ingest a single month as YYYY-MM (overrides months_back)'
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Configure git (for incremental backfill commits)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Ingest disclosures
+        env:
+          SCRAPEDO_API_KEY: ${{ secrets.SCRAPEDO_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+        run: |
+          if [ -n "${{ inputs.month }}" ]; then
+            npm run ingest -- --month "${{ inputs.month }}" --skip-existing --commit-each --concurrency 4
+          elif [ -n "${{ inputs.months_back }}" ]; then
+            npm run ingest -- --months-back "${{ inputs.months_back }}" --skip-existing --commit-each --concurrency 4
+          else
+            npm run ingest -- --latest --skip-existing --commit-each --concurrency 4
+          fi
+
+      - name: Refresh AMFI market-cap list (half-yearly; non-fatal)
+        run: npm run marketcap || echo "marketcap refresh failed — keeping existing data/marketcap.json"
+
+      - name: Derive browser summaries
+        run: npm run derive
+
+      - name: Commit derived summaries
+        run: |
+          # Raw months are committed incrementally during ingest (--commit-each).
+          # Here we commit the market-cap list + small browser summaries.
+          git add data/marketcap.json public/data
+          if git diff --cached --quiet; then
+            echo "No summary changes to commit."
+          else
+            git commit -m "data: derive summaries ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do git push && break || sleep $((2 ** i)); done
+          fi
