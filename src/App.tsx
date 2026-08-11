@@ -3,12 +3,13 @@ import type { SectorSummary, StockRow, StocksSummary, SummaryMeta } from "./type
 import { loadSectors, loadStocks, loadSummary } from "./lib/data";
 import { DASH, formatCount, formatSignedCount } from "./lib/format";
 import { makeSectorScale } from "./lib/palette";
-import { useRoute } from "./lib/router";
+import { navigate, useRoute } from "./lib/router";
 import { TooltipProvider } from "./components/Tooltip";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { DivergingBars, type DivRow } from "./components/charts";
 import { StockTable } from "./components/StockTable";
 import { StockDetailPage } from "./components/StockDetail";
+import { IdeasPage } from "./components/Ideas";
 
 type Data = { summary: SummaryMeta; stocks: StocksSummary; sectors: SectorSummary };
 type LoadState =
@@ -19,11 +20,16 @@ type LoadState =
 export function App() {
   const path = useRoute();
   const stockMatch = path.match(/^\/stock\/([^/]+)$/);
+  const content = stockMatch ? (
+    <StockDetailPage isin={decodeURIComponent(stockMatch[1])} />
+  ) : path === "/ideas" ? (
+    <IdeasPage />
+  ) : (
+    <DashboardLoader />
+  );
   return (
     <TooltipProvider>
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "26px 24px 64px" }}>
-        {stockMatch ? <StockDetailPage isin={decodeURIComponent(stockMatch[1])} /> : <DashboardLoader />}
-      </div>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "26px 24px 64px" }}>{content}</div>
     </TooltipProvider>
   );
 }
@@ -71,6 +77,7 @@ function Dashboard({ data }: { data: Data }) {
           </div>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <button className="link t-label" onClick={() => navigate("/ideas")}>Ideas →</button>
           <span className="t-section" style={{ color: "var(--ink-2)" }}>{month.label}</span>
           <ThemeToggle />
         </div>

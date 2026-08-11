@@ -177,5 +177,7 @@ signals, main dashboard, stock detail page) are done. Everything is EQUITY only
 (derive keeps ISINs whose security-type is "01"). The UI follows a fixed design
 system (tokens in `src/index.css`: one font, standardized sizes, the palette,
 sector colours, chart-mark rules) — use it exactly; never invent colours or
-fonts. Client routing is path-based (`/` dashboard, `/stock/<ISIN>` detail).
-When in doubt, keep the five rules, the data shape, and the design system intact.
+fonts. Client routing is path-based (`/` dashboard, `/stock/<ISIN>` detail,
+`/ideas` idea lists). Steps 1–6 are done (setup → ingestion → derived signals →
+dashboard → detail → ideas). When in doubt, keep the five rules, the data shape,
+and the design system intact.

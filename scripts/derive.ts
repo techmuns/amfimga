@@ -49,6 +49,7 @@ const monthLabel = (m: string): string => {
   return `${MONTH_NAMES[Number(mm) - 1]} ${y}`;
 };
 const amcSlugOf = (fundId: string): string => fundId.split(":")[0];
+const round4 = (n: number): number => Math.round(n * 1e4) / 1e4;
 
 /** A stock position as seen in one fund in one month. */
 interface Held {
@@ -154,18 +155,20 @@ function sharesOf(mi: MonthIndex, fundId: string, isin: string): number | null {
   return held.shares; // may be null (held but share count undisclosed)
 }
 
+interface Flow {
+  net: number | null; // coverage-aware net share change
+  buying: number | null; // funds that added (incl. new positions)
+  selling: number | null; // funds that trimmed (incl. exits)
+}
+
 /**
- * Coverage-aware net share change for one stock between month t-1 and t.
- * Only funds whose house is present in BOTH months count. Returns null when
- * there is no prior month or nothing comparable is known.
+ * Coverage-aware flow for one stock between month t-1 and t. Only funds whose
+ * house is present in BOTH months count. All null when there is no prior month
+ * or nothing comparable is known.
  */
-function netChange(
-  prev: MonthIndex,
-  cur: MonthIndex,
-  isin: string,
-): number | null {
+function flowDetail(prev: MonthIndex, cur: MonthIndex, isin: string): Flow {
   const comparable = new Set([...cur.houses].filter((h) => prev.houses.has(h)));
-  if (comparable.size === 0) return null;
+  if (comparable.size === 0) return { net: null, buying: null, selling: null };
 
   const fundIds = new Set<string>();
   for (const id of cur.holders.get(isin) ?? []) if (comparable.has(amcSlugOf(id))) fundIds.add(id);
@@ -173,15 +176,23 @@ function netChange(
 
   let net = 0;
   let known = false;
+  let buying = 0;
+  let selling = 0;
   for (const id of fundIds) {
     const sPrev = sharesOf(prev, id, isin);
     const sCur = sharesOf(cur, id, isin);
     if (sPrev == null || sCur == null) continue; // undisclosed shares → unknown
-    net += sCur - sPrev;
+    const d = sCur - sPrev;
+    net += d;
     known = true;
+    if (d > 0) buying++;
+    else if (d < 0) selling++;
   }
-  return known ? net : null;
+  return known ? { net, buying, selling } : { net: null, buying: null, selling: null };
 }
+
+const netChange = (prev: MonthIndex, cur: MonthIndex, isin: string): number | null =>
+  flowDetail(prev, cur, isin).net;
 
 function main(): void {
   const months = loadMonths();
@@ -279,9 +290,45 @@ function main(): void {
       }
     }
 
+    // This month's flow detail (funds adding vs trimming), coverage-aware.
+    const flow = L >= 1 ? flowDetail(idx[L - 1], idx[L], isin) : { net: null, buying: null, selling: null };
+
+    // Brand-new to funds this month: never held in any earlier month, and held
+    // now by a house that was ALSO present last month (so it's a real new entry,
+    // not just a fund house joining the dataset).
+    let newEntry = false;
+    if (L >= 1) {
+      const heldBefore = idx.slice(0, L).some((mi) => (mi.holders.get(isin)?.length ?? 0) > 0);
+      const comparable = new Set([...idx[L].houses].filter((h) => idx[L - 1].houses.has(h)));
+      const heldNowComparable = (idx[L].holders.get(isin) ?? []).some((id) => comparable.has(amcSlugOf(id)));
+      newEntry = !heldBefore && heldNowComparable;
+    }
+
+    // Dominant holder this month (which fund owns the biggest slice of the
+    // mutual-fund-held shares) — for the "held by only a few funds" ideas.
+    let topHolder: StockRow["topHolder"];
+    {
+      const holderIds = idx[L].holders.get(isin) ?? [];
+      let topId: string | null = null;
+      let topShares = -1;
+      let sum = 0;
+      for (const id of holderIds) {
+        const s = idx[L].funds.get(id)!.holds.get(isin)!.shares;
+        if (s != null) {
+          sum += s;
+          if (s > topShares) { topShares = s; topId = id; }
+        }
+      }
+      if (topId && sum > 0) {
+        const mf = idx[L].funds.get(topId)!;
+        topHolder = { fundName: mf.fundName, fundHouse: mf.fundHouse, sharePct: round4((topShares / sum) * 100) };
+      }
+    }
+
     stocks.push({
       isin, name, sector, marketCap: null,
       totalShares, totalValueInr, fundCount, netShareChange: nsc, coverageAffected,
+      fundsBuying: flow.buying, fundsSelling: flow.selling, newEntry, topHolder,
     });
 
     // Fund-by-fund detail.

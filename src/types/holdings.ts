@@ -167,6 +167,16 @@ export interface StockRow {
    * its previous shares aren't counted.
    */
   coverageAffected?: { house: string; direction: "entered" | "left" }[];
+
+  // --- Latest-month idea signals (coverage-aware) ---
+  /** Funds that added shares this month (incl. new positions). `null` if unknown. */
+  fundsBuying?: number | null;
+  /** Funds that trimmed shares this month (incl. exits). `null` if unknown. */
+  fundsSelling?: number | null;
+  /** True if brand-new to funds this month (never held before; a real entry, not a house joining). */
+  newEntry?: boolean;
+  /** The fund holding the biggest slice of the mutual-fund-owned shares this month. */
+  topHolder?: { fundName: string; fundHouse: string; sharePct: number };
 }
 
 /** `public/data/stocks/<ISIN>.json` — per-stock detail, loaded on demand. */
