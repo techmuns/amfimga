@@ -37,7 +37,7 @@ export interface Holding {
 
 /** Everything one fund reported for one month. */
 export interface FundHoldings {
-  /** Stable slug identifying the fund across months, e.g. "example-bluechip-fund". */
+  /** Stable id identifying the fund across months, "<AMC-Slug>:<schemeCode>" e.g. "Axis-Mutual-Fund:AXIS500". */
   fundId: string;
   /** Display name of the fund/scheme. */
   fundName: string;
