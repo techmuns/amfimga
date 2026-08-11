@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { StockRow, StocksSummary } from "../types/holdings";
 import type { SectorScale } from "../lib/palette";
 import { DASH, formatCount, formatSignedCount } from "../lib/format";
+import { navigate } from "../lib/router";
 import { Sparkline } from "./charts";
 import { useTooltip } from "./Tooltip";
 
@@ -230,7 +231,11 @@ function Row({
   );
 
   return (
-    <div className="stock-grid stock-row" style={{ height: ROW, padding: "0 14px" }}>
+    <div
+      className="stock-grid stock-row"
+      style={{ height: ROW, padding: "0 14px", cursor: "pointer" }}
+      onClick={() => navigate(`/stock/${s.isin}`)}
+    >
       <div className="t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.name}>
         {s.name}
       </div>

@@ -35,6 +35,16 @@ export function formatCount(value: number | null | undefined): string {
   return value.toLocaleString("en-IN");
 }
 
+/** Compact whole-number count for axis labels, e.g. 51405000 → "5.1 Cr". Dash if unknown. */
+export function formatCountShort(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return DASH;
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1e7) return `${sign}${(abs / 1e7).toFixed(1)} Cr`;
+  if (abs >= 1e5) return `${sign}${(abs / 1e5).toFixed(1)} L`;
+  return `${sign}${abs.toLocaleString("en-IN")}`;
+}
+
 /**
  * Format a signed share-change, e.g. 1200000 → "+12,00,000", -34500 → "−34,500".
  * Returns {@link DASH} for null/unknown — a coverage gap is never shown as 0.

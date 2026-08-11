@@ -54,6 +54,7 @@ const amcSlugOf = (fundId: string): string => fundId.split(":")[0];
 interface Held {
   shares: number | null;
   value: number | null;
+  percent: number | null;
   sector: string | null;
   name: string;
 }
@@ -128,10 +129,12 @@ function indexMonth(data: MonthData): MonthIndex {
         // Same ISIN listed on more than one line in a scheme → combine.
         prev.shares = addKnown(prev.shares, h.shares);
         prev.value = addKnown(prev.value, h.marketValueInr);
+        prev.percent = addKnown(prev.percent, h.portfolioPercent);
         if (!prev.sector && h.sector) prev.sector = h.sector;
       } else {
         mf.holds.set(h.isin, {
-          shares: h.shares, value: h.marketValueInr, sector: h.sector, name: h.stockName,
+          shares: h.shares, value: h.marketValueInr, percent: h.portfolioPercent,
+          sector: h.sector, name: h.stockName,
         });
         let list = holders.get(h.isin);
         if (!list) holders.set(h.isin, (list = []));
@@ -293,13 +296,18 @@ function main(): void {
       const shares: (number | null)[] = [];
       const change: (number | null)[] = [];
       const event: (("new" | "exit") | null)[] = [];
+      const percent: (number | null)[] = [];
+      const present: boolean[] = [];
 
       for (let t = 0; t < T; t++) {
         const mf = idx[t].funds.get(fundId);
         if (mf) { fundName = mf.fundName; fundHouse = mf.fundHouse; }
         const housePresent = idx[t].houses.has(amcSlug);
-        const s = !housePresent ? null : mf?.holds.has(isin) ? mf.holds.get(isin)!.shares : 0;
+        present.push(housePresent);
+        const held = housePresent ? mf?.holds.get(isin) : undefined;
+        const s = !housePresent ? null : held ? held.shares : 0;
         shares.push(s);
+        percent.push(!housePresent ? null : held ? held.percent : 0);
 
         const sp = t === 0 ? null : shares[t - 1];
         if (t === 0 || s == null || sp == null) {
@@ -310,7 +318,7 @@ function main(): void {
           event.push(sp === 0 && s > 0 ? "new" : sp > 0 && s === 0 ? "exit" : null);
         }
       }
-      funds.push({ fundId, fundName, fundHouse, shares, change, event });
+      funds.push({ fundId, fundName, fundHouse, shares, change, event, percent, present });
     }
     // Biggest current positions first (nulls last).
     funds.sort((a, b) => (b.shares[T - 1] ?? -1) - (a.shares[T - 1] ?? -1));
@@ -336,9 +344,19 @@ function main(): void {
   rmSync(DETAIL_DIR, { recursive: true, force: true });
   mkdirSync(DETAIL_DIR, { recursive: true });
 
+  // Sector colour order — the 8 biggest sectors by latest value get a colour;
+  // stored so every page (dashboard + detail) colours sectors identically.
+  const sectorValue = new Map<string, number>();
+  for (const s of stocks) {
+    if (!s.sector) continue;
+    sectorValue.set(s.sector, (sectorValue.get(s.sector) ?? 0) + (s.totalValueInr[L] ?? 0));
+  }
+  const topSectors = [...sectorValue.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([s]) => s);
+
   const summary: SummaryMeta = {
     schemaVersion: SCHEMA,
     generatedAt: new Date().toISOString(),
+    topSectors,
     months: months.map((m, t) => ({
       month: m.month,
       label: labels[t],

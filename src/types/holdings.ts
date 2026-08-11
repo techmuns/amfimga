@@ -120,6 +120,8 @@ export interface DataIndex {
 export interface SummaryMeta {
   schemaVersion: number;
   generatedAt: string;
+  /** The (up to) 8 biggest sectors by value, in colour order. Rest fold to "Other". */
+  topSectors: string[];
   months: MonthMeta[];
 }
 
@@ -194,6 +196,10 @@ export interface FundTrend {
   change: (number | null)[];
   /** Per-month event: a `new` position or an `exit`, else `null`. */
   event: (("new" | "exit") | null)[];
+  /** Per-month share of the fund's own portfolio (0–100). `null` when unknown. */
+  percent: (number | null)[];
+  /** Per-month: was this fund's HOUSE present in the data? Drives the coverage hover. */
+  present: boolean[];
 }
 
 /** `public/data/sectors.json` — net share-change summed by sector, per month. */

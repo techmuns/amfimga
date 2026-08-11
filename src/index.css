@@ -95,6 +95,34 @@
     column-gap: 12px;
   }
 
+  /* Funds table on the stock detail page. */
+  .fund-grid {
+    display: grid;
+    grid-template-columns: minmax(200px, 2fr) 120px 150px 84px 76px 96px;
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  .badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .link {
+    color: var(--ink-2);
+    cursor: pointer;
+    background: none;
+    border: 0;
+    font: inherit;
+    padding: 0;
+  }
+  .link:hover { color: var(--ink); text-decoration: underline; }
+
   .panel {
     background: var(--surface);
     border: 1px solid var(--border);

@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import type { SectorSummary, StockRow, StocksSummary, SummaryMeta } from "./types/holdings";
 import { loadSectors, loadStocks, loadSummary } from "./lib/data";
 import { DASH, formatCount, formatSignedCount } from "./lib/format";
-import { buildSectorScale } from "./lib/palette";
-import { getInitialTheme, setTheme, type Theme } from "./lib/theme";
+import { makeSectorScale } from "./lib/palette";
+import { useRoute } from "./lib/router";
 import { TooltipProvider } from "./components/Tooltip";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { DivergingBars, type DivRow } from "./components/charts";
 import { StockTable } from "./components/StockTable";
+import { StockDetailPage } from "./components/StockDetail";
 
 type Data = { summary: SummaryMeta; stocks: StocksSummary; sectors: SectorSummary };
 type LoadState =
@@ -15,6 +17,18 @@ type LoadState =
   | { status: "ready"; data: Data };
 
 export function App() {
+  const path = useRoute();
+  const stockMatch = path.match(/^\/stock\/([^/]+)$/);
+  return (
+    <TooltipProvider>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "26px 24px 64px" }}>
+        {stockMatch ? <StockDetailPage isin={decodeURIComponent(stockMatch[1])} /> : <DashboardLoader />}
+      </div>
+    </TooltipProvider>
+  );
+}
+
+function DashboardLoader() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
@@ -33,22 +47,16 @@ export function App() {
     };
   }, []);
 
-  return (
-    <TooltipProvider>
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "26px 24px 64px" }}>
-        {state.status === "loading" && <p className="t-muted">Loading…</p>}
-        {state.status === "error" && <p className="t-body" style={{ color: "var(--sell)" }}>Couldn&apos;t load data: {state.reason}</p>}
-        {state.status === "ready" && <Dashboard data={state.data} />}
-      </div>
-    </TooltipProvider>
-  );
+  if (state.status === "loading") return <p className="t-muted">Loading…</p>;
+  if (state.status === "error") return <p className="t-body" style={{ color: "var(--sell)" }}>Couldn&apos;t load data: {state.reason}</p>;
+  return <Dashboard data={state.data} />;
 }
 
 function Dashboard({ data }: { data: Data }) {
   const { summary, stocks, sectors } = data;
   const last = stocks.months.length - 1;
   const month = summary.months[summary.months.length - 1];
-  const scale = useMemo(() => buildSectorScale(stocks.stocks, last), [stocks, last]);
+  const scale = useMemo(() => makeSectorScale(summary.topSectors), [summary]);
 
   const moves = useMemo(() => buildMoveRows(stocks.stocks, last), [stocks, last]);
   const sectorRows = useMemo(() => buildSectorRows(sectors, sectors.months.length - 1), [sectors]);
@@ -85,20 +93,6 @@ function Dashboard({ data }: { data: Data }) {
         <StockTable data={stocks} scale={scale} monthIdx={last} />
       </section>
     </>
-  );
-}
-
-function ThemeToggle() {
-  const [theme, setLocal] = useState<Theme>(() => getInitialTheme());
-  const flip = () => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    setLocal(next);
-  };
-  return (
-    <button className="theme-btn" onClick={flip} aria-label="Toggle theme">
-      {theme === "dark" ? "☀ Light" : "☾ Dark"}
-    </button>
   );
 }
 

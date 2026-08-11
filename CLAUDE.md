@@ -172,9 +172,10 @@ npm run data                  # ingest --latest, then derive
 
 ## Scope discipline
 
-Build this project one step at a time. Steps 1–4 (setup, ingestion, derived
-signals, main dashboard) are done. The dashboard follows a fixed design system
-(tokens in `src/index.css`: one font, standardized sizes, the palette, sector
-colours, chart-mark rules) — use it exactly; never invent colours or fonts.
-Next up: the per-stock detail page. When in doubt, keep the five rules, the data
-shape, and the design system intact.
+Build this project one step at a time. Steps 1–5 (setup, ingestion, derived
+signals, main dashboard, stock detail page) are done. Everything is EQUITY only
+(derive keeps ISINs whose security-type is "01"). The UI follows a fixed design
+system (tokens in `src/index.css`: one font, standardized sizes, the palette,
+sector colours, chart-mark rules) — use it exactly; never invent colours or
+fonts. Client routing is path-based (`/` dashboard, `/stock/<ISIN>` detail).
+When in doubt, keep the five rules, the data shape, and the design system intact.
