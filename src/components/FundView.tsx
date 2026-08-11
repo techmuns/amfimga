@@ -3,9 +3,9 @@ import type { FundDetail, FundHoldingTrend, FundsIndex, SummaryMeta } from "../t
 import { loadFundDetail, loadFundsIndex, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
-import { DASH, formatCount, formatCountShort, formatInr, formatPercent, formatSignedCount } from "../lib/format";
+import { DASH, formatCountShort, formatInr, formatPercent, formatSignedCount } from "../lib/format";
 import { CapPill } from "./caps";
-import { Sparkline } from "./charts";
+import { TrendSpark } from "./Trend";
 import { ThemeToggle } from "./ThemeToggle";
 import { useTooltip } from "./Tooltip";
 
@@ -383,12 +383,6 @@ function HoldRow({ h, last, labels, scale, comparable, tt }: {
   const changeMsg = c == null
     ? (!comparable ? "This fund wasn't in last month's data — change isn't counted (not a sell)." : h.event[last] === "new" ? "New position this month." : "Shares not disclosed.")
     : null;
-  const trendTip = (
-    <div>
-      <div className="t-label">{h.name}</div>
-      {h.shares.map((v, i) => <div key={i}><span className="k">{labels[i]}: </span>{formatCount(v)}</div>)}
-    </div>
-  );
   return (
     <div className="hold-grid stock-row" style={{ padding: "8px 14px", cursor: "pointer" }} onClick={() => navigate(`/stock/${h.isin}`)}>
       <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 8 }}>
@@ -409,12 +403,7 @@ function HoldRow({ h, last, labels, scale, comparable, tt }: {
         onMouseLeave={tt.hide}>
         {c == null ? DASH : <>{buy ? "▲" : sell ? "▼" : ""} {formatSignedCount(c)}</>}
       </div>
-      <div onClick={(e) => e.stopPropagation()}
-        onMouseEnter={(e) => tt.show(trendTip, e.clientX, e.clientY)}
-        onMouseMove={(e) => tt.move(e.clientX, e.clientY)}
-        onMouseLeave={tt.hide}>
-        <Sparkline values={h.shares} />
-      </div>
+      <TrendSpark values={h.shares} title={h.name} subtitle="Shares held by this fund, month by month" monthLabels={labels} />
     </div>
   );
 }

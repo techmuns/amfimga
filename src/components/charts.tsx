@@ -169,18 +169,23 @@ export function LineChart({
             <circle cx={x(hi)} cy={y(values[hi]!)} r="4" fill="var(--ink)" />
           </>
         )}
-        {labels.map((l, i) => (
-          <text
-            key={i}
-            x={x(i)}
-            y={H - 7}
-            fill="var(--muted)"
-            fontSize="12"
-            textAnchor={i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle"}
-          >
-            {l}
-          </text>
-        ))}
+        {labels.map((l, i) => {
+          // Thin the axis to ~7 labels so 19 months don't overlap.
+          const step = Math.max(1, Math.ceil(labels.length / 7));
+          if (i !== 0 && i !== labels.length - 1 && i % step !== 0) return null;
+          return (
+            <text
+              key={i}
+              x={x(i)}
+              y={H - 7}
+              fill="var(--muted)"
+              fontSize="12"
+              textAnchor={i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle"}
+            >
+              {l}
+            </text>
+          );
+        })}
         {values.map((_, i) => (
           <rect
             key={i}

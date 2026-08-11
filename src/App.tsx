@@ -6,6 +6,7 @@ import { navigate, useRoute } from "./lib/router";
 import { exportExcel } from "./lib/exportExcel";
 import { exportPdf } from "./lib/exportPdf";
 import { TooltipProvider } from "./components/Tooltip";
+import { TrendProvider } from "./components/Trend";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { StockTable } from "./components/StockTable";
 import { StockDetailPage } from "./components/StockDetail";
@@ -37,7 +38,9 @@ export function App() {
   );
   return (
     <TooltipProvider>
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "20px 24px 72px" }}>{content}</div>
+      <TrendProvider>
+        <div style={{ maxWidth: 1080, margin: "0 auto", padding: "20px 24px 72px" }}>{content}</div>
+      </TrendProvider>
     </TooltipProvider>
   );
 }
@@ -61,7 +64,15 @@ function Tabbed({ path }: { path: string }) {
     <>
       <header className="topbar">
         <div className="brand">
-          <span className="brand-name">Mutual Fund Ownership Insights</span>
+          <span className="brand-name">
+            Mutual Fund Ownership Insights
+            {month && (
+              <span
+                className="info-i"
+                title={`India has about ${month.housesTotal} fund houses. We have ${month.label}'s data for ${month.housesPresent} of them — the rest either haven't published this month yet or couldn't be fetched, and are NEVER shown as zero (they read "—"). Month-over-month changes only compare houses present in BOTH months, so a house simply appearing is never mistaken for buying.`}
+              >i</span>
+            )}
+          </span>
           <span className="brand-sub">{month ? `Based on ${month.housesPresent} of ${month.housesTotal} fund houses · ${month.label}` : " "}</span>
         </div>
         <div className="ml-auto flex items-center gap-2">

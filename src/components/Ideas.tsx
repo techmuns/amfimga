@@ -5,7 +5,7 @@ import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
 import { DASH, formatSignedCount } from "../lib/format";
 import { CapFilter, CapPill, capPass } from "./caps";
-import { Sparkline } from "./charts";
+import { TrendSpark } from "./Trend";
 import { ThemeToggle } from "./ThemeToggle";
 
 type State =
@@ -61,7 +61,9 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
     return (c != null && c <= 3) || (s.topHolder != null && s.topHolder.sharePct >= 70);
   }), [all, L]);
 
-  const spark = (r: StockRow) => <Sparkline values={r.totalShares} />;
+  const spark = (r: StockRow) => (
+    <TrendSpark values={r.totalShares} title={r.name} subtitle="Total shares held across all funds" monthLabels={stocks.monthLabels} />
+  );
   const stockCol: Col = { label: "Stock", render: (r) => <StockCell r={r} scale={scale} /> };
   const trendCol: Col = { label: "Trend", render: spark };
   const netCol: Col = { label: "Net change", align: "right", sortValue: (r) => r.netShareChange[L], render: (r) => <Change v={r.netShareChange[L]} note={coverageNote(r)} /> };

@@ -4,7 +4,7 @@ import type { SectorScale } from "../lib/palette";
 import { DASH, formatCount, formatCountShort, formatSignedCount } from "../lib/format";
 import { navigate } from "../lib/router";
 import { CapFilter, CapPill, capPass } from "./caps";
-import { Sparkline } from "./charts";
+import { TrendSpark } from "./Trend";
 import { useTooltip } from "./Tooltip";
 
 type SortKey = "name" | "sector" | "shares" | "net" | "funds";
@@ -234,15 +234,6 @@ function Row({
     </div>
   );
 
-  const trendTip = (
-    <div>
-      <div className="t-label">{s.name}</div>
-      {s.totalShares.map((v, i) => (
-        <div key={i}><span className="k">{labels[i]}: </span>{formatCount(v)}</div>
-      ))}
-    </div>
-  );
-
   return (
     <div
       className="stock-grid stock-row"
@@ -261,13 +252,7 @@ function Row({
           {s.macroSector ?? DASH}
         </span>
       </div>
-      <div
-        onMouseEnter={(e) => tt.show(trendTip, e.clientX, e.clientY)}
-        onMouseMove={(e) => tt.move(e.clientX, e.clientY)}
-        onMouseLeave={tt.hide}
-      >
-        <Sparkline values={s.totalShares} />
-      </div>
+      <TrendSpark values={s.totalShares} title={s.name} subtitle="Total shares held across all funds" monthLabels={labels} />
       <div className="cell-r t-body num">{formatCountShort(shares)}</div>
       <div
         style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "center", cursor: cov.length ? "help" : "default" }}

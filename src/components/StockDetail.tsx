@@ -3,9 +3,10 @@ import type { FundTrend, StockDetail, SummaryMeta } from "../types/holdings";
 import { fundFileKey, loadStockDetail, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale } from "../lib/palette";
-import { DASH, formatCount, formatCountShort, formatPercent, formatSignedCount } from "../lib/format";
+import { DASH, formatCountShort, formatPercent, formatSignedCount } from "../lib/format";
 import { CapPill } from "./caps";
-import { LineChart, NetBars, Sparkline } from "./charts";
+import { LineChart, NetBars } from "./charts";
+import { TrendSpark } from "./Trend";
 import { ThemeToggle } from "./ThemeToggle";
 import { useTooltip } from "./Tooltip";
 
@@ -166,15 +167,6 @@ function FundRow({ f, last, labels, tt }: { f: FundTrend; last: number; labels: 
     ? { label: "Exited", color: "var(--sell)" }
     : { label: "Holding", color: "var(--muted)" };
 
-  const trendTip = (
-    <div>
-      <div className="t-label">{f.fundName}</div>
-      {f.shares.map((v, i) => (
-        <div key={i}><span className="k">{labels[i]}: </span>{formatCount(v)}</div>
-      ))}
-    </div>
-  );
-
   return (
     <div className="fund-grid stock-row" style={{ padding: "8px 14px" }}>
       <div style={{ minWidth: 0 }}>
@@ -213,13 +205,7 @@ function FundRow({ f, last, labels, tt }: { f: FundTrend; last: number; labels: 
       >
         {c == null ? DASH : <>{buy ? "▲" : sell ? "▼" : ""} {formatSignedCount(c)}</>}
       </div>
-      <div
-        onMouseEnter={(e) => tt.show(trendTip, e.clientX, e.clientY)}
-        onMouseMove={(e) => tt.move(e.clientX, e.clientY)}
-        onMouseLeave={tt.hide}
-      >
-        <Sparkline values={f.shares} />
-      </div>
+      <TrendSpark values={f.shares} title={f.fundName} subtitle="Shares held in this stock, month by month" monthLabels={labels} />
       <div className="cell-r t-body num">{formatPercent(f.percent[last])}</div>
       <div><span className="badge" style={{ color: status.color, borderColor: status.color }}>{status.label}</span></div>
     </div>
