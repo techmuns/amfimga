@@ -146,12 +146,18 @@ export interface StocksSummary {
   stocks: StockRow[];
 }
 
+/** Market-cap class from AMFI's half-yearly list (Large 1–100, Mid 101–250, Small 251+). */
+export type MarketCap = "large" | "mid" | "small";
+
 export interface StockRow {
   isin: string;
   name: string;
+  /** Granular industry (NSE), shown on the detail page. */
   sector: string | null;
-  /** Large/mid/small — left null until the AMFI list is added in a later step. */
-  marketCap: null;
+  /** Broad macro sector (~12) used for colour chips, filters, and the sector chart. */
+  macroSector: string | null;
+  /** Large/mid/small from AMFI, matched by ISIN. `null` when not confidently matched. */
+  marketCap: MarketCap | null;
   /** Per-month total shares across all present funds. `null` = not held / unknown. */
   totalShares: (number | null)[];
   /** Per-month total market value in plain rupees. `null` = not held / unknown. */
@@ -184,8 +190,11 @@ export interface StockDetail {
   schemaVersion: number;
   isin: string;
   name: string;
+  /** Granular industry (shown on this page). */
   sector: string | null;
-  marketCap: null;
+  /** Broad macro sector (for the sector colour). */
+  macroSector: string | null;
+  marketCap: MarketCap | null;
   months: string[];
   monthLabels: string[];
   totalShares: (number | null)[];

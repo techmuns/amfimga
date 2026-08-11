@@ -11,8 +11,9 @@
     "deploy": "npm run derive && npm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "ingest": "tsx scripts/ingest.ts",
+    "marketcap": "tsx scripts/marketcap.ts",
     "derive": "tsx scripts/derive.ts",
-    "data": "npm run ingest -- --latest && npm run derive"
+    "data": "npm run ingest -- --latest && npm run marketcap && npm run derive"
   },
   "dependencies": {
     "react": "^19.2.8",

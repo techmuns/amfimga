@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import type { StockRow, StocksSummary } from "../types/holdings";
+import type { MarketCap, StockRow, StocksSummary } from "../types/holdings";
 import type { SectorScale } from "../lib/palette";
 import { DASH, formatCount, formatSignedCount } from "../lib/format";
 import { navigate } from "../lib/router";
+import { CapFilter, CapPill, capPass } from "./caps";
 import { Sparkline } from "./charts";
 import { useTooltip } from "./Tooltip";
 
@@ -26,6 +27,7 @@ export function StockTable({
   const [q, setQ] = useState("");
   const [sectors, setSectors] = useState<Set<string>>(new Set());
   const [otherOn, setOtherOn] = useState(false);
+  const [capSel, setCapSel] = useState<Set<MarketCap>>(new Set());
   const [sort, setSort] = useState<{ key: SortKey; dir: Dir }>({ key: "net", dir: "desc" });
   const [scrollTop, setScrollTop] = useState(0);
 
@@ -46,14 +48,15 @@ export function StockTable({
     if (ql) list = list.filter((s) => s.name.toLowerCase().includes(ql));
     if (sectors.size || otherOn) {
       list = list.filter(
-        (s) => (s.sector != null && sectors.has(s.sector)) || (otherOn && scale.isOther(s.sector)),
+        (s) => (s.macroSector != null && sectors.has(s.macroSector)) || (otherOn && scale.isOther(s.macroSector)),
       );
     }
+    if (capSel.size) list = list.filter((s) => capPass(s.marketCap, capSel));
     const dir = sort.dir === "asc" ? 1 : -1;
     const key = (s: StockRow): number | string | null => {
       switch (sort.key) {
         case "name": return s.name.toLowerCase();
-        case "sector": return (s.sector ?? "￿").toLowerCase();
+        case "sector": return (s.macroSector ?? "￿").toLowerCase();
         case "shares": return s.totalShares[m];
         case "net": return s.netShareChange[m];
         case "funds": return s.fundCount[m];
@@ -68,7 +71,15 @@ export function StockTable({
       if (typeof av === "string") return av < (bv as string) ? -dir : av > (bv as string) ? dir : 0;
       return ((av as number) - (bv as number)) * dir;
     });
-  }, [data, q, sectors, otherOn, sort, scale, m]);
+  }, [data, q, sectors, otherOn, capSel, sort, scale, m]);
+
+  const toggleCap = (c: MarketCap) =>
+    setCapSel((prev) => {
+      const n = new Set(prev);
+      if (n.has(c)) n.delete(c);
+      else n.add(c);
+      return n;
+    });
 
   const eff = Math.max(0, scrollTop - HEADER);
   const start = Math.max(0, Math.floor(eff / ROW) - OVERSCAN);
@@ -122,6 +133,8 @@ export function StockTable({
             Other
           </button>
         </div>
+        <span className="t-muted" style={{ marginLeft: 6 }}>Cap:</span>
+        <CapFilter selected={capSel} onToggle={toggleCap} />
         <span className="t-muted ml-auto">{rows.length.toLocaleString("en-IN")} stocks</span>
       </div>
 
@@ -236,13 +249,16 @@ function Row({
       style={{ height: ROW, padding: "0 14px", cursor: "pointer" }}
       onClick={() => navigate(`/stock/${s.isin}`)}
     >
-      <div className="t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.name}>
-        {s.name}
+      <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.name}>
+          {s.name}
+        </span>
+        <CapPill cap={s.marketCap} />
       </div>
       <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 6 }}>
-        <span className="sec-dot" style={{ background: scale.colorOf(s.sector) }} />
+        <span className="sec-dot" style={{ background: scale.colorOf(s.macroSector) }} />
         <span className="t-body" style={{ color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {s.sector ?? DASH}
+          {s.macroSector ?? DASH}
         </span>
       </div>
       <div

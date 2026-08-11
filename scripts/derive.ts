@@ -51,6 +51,44 @@ const monthLabel = (m: string): string => {
 const amcSlugOf = (fundId: string): string => fundId.split(":")[0];
 const round4 = (n: number): number => Math.round(n * 1e4) / 1e4;
 
+// --- Part A: granular NSE industries → ~12 broad AMFI-style macro sectors ---
+const MACRO_GROUPS: Record<string, string[]> = {
+  "Financial Services": ["banks", "finance", "capital markets", "insurance", "financial technology (fintech)"],
+  "Information Technology": ["it - software", "it - services", "it - hardware"],
+  "Healthcare": ["pharmaceuticals & biotechnology", "healthcare services", "healthcare equipment & supplies"],
+  "Energy": ["oil", "gas", "petroleum products", "consumable fuels"],
+  "Consumer Discretionary": ["automobiles", "auto components", "consumer durables", "retailing", "leisure services", "realty", "textiles & apparels", "other consumer services", "agricultural, commercial & construction vehicles"],
+  "Consumer Staples": ["diversified fmcg", "food products", "beverages", "personal products", "household products", "agricultural food & other products", "cigarettes & tobacco products"],
+  "Industrials": ["industrial products", "electrical equipment", "construction", "industrial manufacturing", "aerospace & defense", "commercial services & supplies", "transport services", "transport infrastructure"],
+  "Materials": ["chemicals & petrochemicals", "fertilizers & agrochemicals", "ferrous metals", "non - ferrous metals", "diversified metals", "minerals & mining", "metals & minerals trading", "paper, forest & jute products", "cement & cement products", "other construction materials"],
+  "Utilities": ["power", "other utilities"],
+  "Communication": ["telecom - services", "telecom - equipment & accessories", "media", "entertainment"],
+  "Diversified": ["diversified"],
+};
+const normIndustry = (s: string): string =>
+  s.toLowerCase().replace(/\s+and\s+/g, " & ").replace(/\s+/g, " ").trim();
+const INDUSTRY_TO_MACRO = new Map<string, string>();
+for (const [macro, inds] of Object.entries(MACRO_GROUPS)) {
+  for (const ind of inds) INDUSTRY_TO_MACRO.set(normIndustry(ind), macro);
+}
+/** Map a granular industry to its macro sector; unmapped/unknown → null (never guess). */
+function macroOf(sector: string | null): string | null {
+  if (!sector) return null;
+  return INDUSTRY_TO_MACRO.get(normIndustry(sector)) ?? "Other";
+}
+
+// --- Part B: AMFI large/mid/small cap map (ISIN → cap), produced by scripts/marketcap.ts ---
+type Cap = "large" | "mid" | "small";
+function loadCaps(): Record<string, Cap> {
+  const p = resolve(ROOT, "data/marketcap.json");
+  if (!existsSync(p)) return {};
+  try {
+    return (JSON.parse(readFileSync(p, "utf8")) as { caps?: Record<string, Cap> }).caps ?? {};
+  } catch {
+    return {};
+  }
+}
+
 /** A stock position as seen in one fund in one month. */
 interface Held {
   shares: number | null;
@@ -204,6 +242,8 @@ function main(): void {
   const labels = monthKeys.map(monthLabel);
   const T = months.length;
   const idx = months.map((m) => indexMonth(m.data));
+  const caps = loadCaps();
+  let capMatched = 0;
 
   console.log(`Deriving from ${T} months: ${monthKeys.join(", ")}`);
 
@@ -241,6 +281,9 @@ function main(): void {
   for (const isin of isins) {
     const name = nameOf.get(isin) ?? isin;
     const sector = sectorOf.get(isin) ?? null;
+    const macroSector = macroOf(sector);
+    const marketCap = caps[isin] ?? null;
+    if (marketCap) capMatched++;
 
     const totalShares: (number | null)[] = [];
     const totalValueInr: (number | null)[] = [];
@@ -326,7 +369,7 @@ function main(): void {
     }
 
     stocks.push({
-      isin, name, sector, marketCap: null,
+      isin, name, sector, macroSector, marketCap,
       totalShares, totalValueInr, fundCount, netShareChange: nsc, coverageAffected,
       fundsBuying: flow.buying, fundsSelling: flow.selling, newEntry, topHolder,
     });
@@ -371,15 +414,15 @@ function main(): void {
     funds.sort((a, b) => (b.shares[T - 1] ?? -1) - (a.shares[T - 1] ?? -1));
 
     details.push({
-      schemaVersion: SCHEMA, isin, name, sector, marketCap: null,
+      schemaVersion: SCHEMA, isin, name, sector, macroSector, marketCap,
       months: monthKeys, monthLabels: labels,
       totalShares, totalValueInr, fundCount, netShareChange: nsc, funds,
     });
 
-    // Sector roll-up (skip stocks with no disclosed sector — never invent one).
-    if (sector) {
-      let row = sectorTotals.get(sector);
-      if (!row) sectorTotals.set(sector, (row = new Array(T).fill(null)));
+    // Sector roll-up by MACRO sector (skip stocks with no sector — never invent one).
+    if (macroSector) {
+      let row = sectorTotals.get(macroSector);
+      if (!row) sectorTotals.set(macroSector, (row = new Array(T).fill(null)));
       for (let t = 1; t < T; t++) {
         if (nsc[t] != null) row[t] = (row[t] ?? 0) + (nsc[t] as number);
       }
@@ -391,12 +434,12 @@ function main(): void {
   rmSync(DETAIL_DIR, { recursive: true, force: true });
   mkdirSync(DETAIL_DIR, { recursive: true });
 
-  // Sector colour order — the 8 biggest sectors by latest value get a colour;
-  // stored so every page (dashboard + detail) colours sectors identically.
+  // Macro-sector colour order — the 8 biggest macro sectors by latest value get a
+  // colour; stored so every page colours sectors identically. Rest fold to "Other".
   const sectorValue = new Map<string, number>();
   for (const s of stocks) {
-    if (!s.sector) continue;
-    sectorValue.set(s.sector, (sectorValue.get(s.sector) ?? 0) + (s.totalValueInr[L] ?? 0));
+    if (!s.macroSector || s.macroSector === "Other") continue;
+    sectorValue.set(s.macroSector, (sectorValue.get(s.macroSector) ?? 0) + (s.totalValueInr[L] ?? 0));
   }
   const topSectors = [...sectorValue.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([s]) => s);
 
@@ -433,7 +476,11 @@ function main(): void {
 
   console.log(
     `Wrote summary.json, stocks.json (${stocks.length} stocks), sectors.json ` +
-      `(${sectorsOut.sectors.length} sectors), and ${details.length} per-stock detail files.`,
+      `(${sectorsOut.sectors.length} macro sectors), and ${details.length} per-stock detail files.`,
+  );
+  console.log(
+    `Market cap: ${capMatched}/${stocks.length} stocks tagged (${((100 * capMatched) / stocks.length).toFixed(1)}%)` +
+      (Object.keys(caps).length === 0 ? " — no data/marketcap.json (run `npm run marketcap`)" : ""),
   );
   for (const m of summary.months) {
     console.log(`  ${m.label}: ${m.housesPresent}/${m.housesTotal} houses, ${m.fundCount} funds, ${m.stockCount} stocks`);

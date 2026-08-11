@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { StockRow, StocksSummary, SummaryMeta } from "../types/holdings";
+import type { MarketCap, StockRow, StocksSummary, SummaryMeta } from "../types/holdings";
 import { loadStocks, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
 import { DASH, formatSignedCount } from "../lib/format";
+import { CapFilter, CapPill, capPass } from "./caps";
 import { Sparkline } from "./charts";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -40,8 +41,11 @@ export function IdeasPage() {
 function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummary }) {
   const L = stocks.months.length - 1;
   const scale = useMemo(() => makeSectorScale(summary.topSectors), [summary]);
-  const all = stocks.stocks;
   const firstMonth = stocks.monthLabels[0];
+  const [capSel, setCapSel] = useState<Set<MarketCap>>(new Set());
+  const toggleCap = (c: MarketCap) =>
+    setCapSel((prev) => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; });
+  const all = useMemo(() => (capSel.size ? stocks.stocks.filter((s) => capPass(s.marketCap, capSel)) : stocks.stocks), [stocks, capSel]);
 
   const buys = useMemo(() => all.filter((s) => (s.netShareChange[L] ?? 0) > 0), [all, L]);
   const sells = useMemo(() => all.filter((s) => (s.netShareChange[L] ?? 0) < 0), [all, L]);
@@ -62,6 +66,10 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
 
   return (
     <div>
+      <div className="flex flex-wrap items-center gap-2" style={{ margin: "18px 0 2px" }}>
+        <span className="t-muted">Market cap:</span>
+        <CapFilter selected={capSel} onToggle={toggleCap} />
+      </div>
       {/* 1 */}
       <Section title="Funds are buying / selling these" subtitle="The biggest net buys and net sells this month. The more funds moving the same way, the broader the signal.">
         <SubLabel color="var(--buy)">Buying</SubLabel>
@@ -228,10 +236,13 @@ function SubLabel({ children, color, top }: { children: ReactNode; color: string
 function StockCell({ r, scale }: { r: StockRow; scale: SectorScale }) {
   return (
     <div style={{ minWidth: 0 }}>
-      <div className="t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span className="t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+        <CapPill cap={r.marketCap} />
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-        <span className="sec-dot" style={{ background: scale.colorOf(r.sector) }} />
-        <span className="t-muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sector ?? DASH}</span>
+        <span className="sec-dot" style={{ background: scale.colorOf(r.macroSector) }} />
+        <span className="t-muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.macroSector ?? DASH}</span>
       </div>
     </div>
   );

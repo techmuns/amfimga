@@ -12,131 +12,27 @@
   ],
   "sectors": [
     {
-      "sector": "Aerospace & Defense",
+      "sector": "Communication",
       "netShareChange": [
         null,
-        2418270,
-        4614934
+        63843303,
+        -49906277
       ]
     },
     {
-      "sector": "Agricultural Food & other Products",
+      "sector": "Consumer Discretionary",
       "netShareChange": [
         null,
-        -1071903,
-        6720862
+        13356308,
+        159389277
       ]
     },
     {
-      "sector": "Agricultural, Commercial & Construction Vehicles",
+      "sector": "Consumer Staples",
       "netShareChange": [
         null,
-        20144564,
-        -32891241
-      ]
-    },
-    {
-      "sector": "Auto Components",
-      "netShareChange": [
-        null,
-        -21150609,
-        68567151
-      ]
-    },
-    {
-      "sector": "Automobiles",
-      "netShareChange": [
-        null,
-        6571274,
-        12076834
-      ]
-    },
-    {
-      "sector": "Banks",
-      "netShareChange": [
-        null,
-        80325709,
-        180089234
-      ]
-    },
-    {
-      "sector": "Beverages",
-      "netShareChange": [
-        null,
-        10785465,
-        10095980
-      ]
-    },
-    {
-      "sector": "Capital Markets",
-      "netShareChange": [
-        null,
-        4778497,
-        48021273
-      ]
-    },
-    {
-      "sector": "Cement & Cement Products",
-      "netShareChange": [
-        null,
-        -6434637,
-        13972935
-      ]
-    },
-    {
-      "sector": "Chemicals & Petrochemicals",
-      "netShareChange": [
-        null,
-        -5799681,
-        1778416
-      ]
-    },
-    {
-      "sector": "Cigarettes & Tobacco Products",
-      "netShareChange": [
-        null,
-        -964899,
-        681479
-      ]
-    },
-    {
-      "sector": "Commercial Services & Supplies",
-      "netShareChange": [
-        null,
-        460939,
-        1951747
-      ]
-    },
-    {
-      "sector": "Commercial Services and Supplies",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "Construction",
-      "netShareChange": [
-        null,
-        -8963930,
-        4821484
-      ]
-    },
-    {
-      "sector": "Consumable Fuels",
-      "netShareChange": [
-        null,
-        -10441976,
-        1907334
-      ]
-    },
-    {
-      "sector": "Consumer Durables",
-      "netShareChange": [
-        null,
-        -8587863,
-        2723586
+        25992222,
+        63334120
       ]
     },
     {
@@ -148,347 +44,59 @@
       ]
     },
     {
-      "sector": "Diversified FMCG",
+      "sector": "Energy",
       "netShareChange": [
         null,
-        18300618,
-        39982353
+        91120026,
+        68634238
       ]
     },
     {
-      "sector": "Diversified Metals",
+      "sector": "Financial Services",
       "netShareChange": [
         null,
-        -8907487,
-        -17137495
+        72622155,
+        332096460
       ]
     },
     {
-      "sector": "Electrical Equipment",
+      "sector": "Healthcare",
       "netShareChange": [
         null,
-        77091275,
-        -31012037
+        16287982,
+        20108305
       ]
     },
     {
-      "sector": "Entertainment",
+      "sector": "Industrials",
       "netShareChange": [
         null,
-        -138905,
-        -146274
+        72659257,
+        -29468124
       ]
     },
     {
-      "sector": "Ferrous Metals",
+      "sector": "Information Technology",
       "netShareChange": [
         null,
-        67738885,
-        -59912495
+        -21343671,
+        -10605158
       ]
     },
     {
-      "sector": "Fertilizers & Agrochemicals",
+      "sector": "Materials",
       "netShareChange": [
         null,
-        221460,
-        -1568590
+        110567590,
+        -68514395
       ]
     },
     {
-      "sector": "Fertilizers and Agrochemicals",
+      "sector": "Utilities",
       "netShareChange": [
         null,
-        -9052,
-        -209
-      ]
-    },
-    {
-      "sector": "Finance",
-      "netShareChange": [
-        null,
-        -5571803,
-        20686033
-      ]
-    },
-    {
-      "sector": "Financial Technology (Fintech)",
-      "netShareChange": [
-        null,
-        2841938,
-        44488322
-      ]
-    },
-    {
-      "sector": "Food Products",
-      "netShareChange": [
-        null,
-        806364,
-        2434382
-      ]
-    },
-    {
-      "sector": "Gas",
-      "netShareChange": [
-        null,
-        36850453,
-        22420657
-      ]
-    },
-    {
-      "sector": "Healthcare Equipment & Supplies",
-      "netShareChange": [
-        null,
-        865,
-        -24475
-      ]
-    },
-    {
-      "sector": "Healthcare Equipment and Supplies",
-      "netShareChange": [
-        null,
-        -263565,
-        0
-      ]
-    },
-    {
-      "sector": "Healthcare Services",
-      "netShareChange": [
-        null,
-        2764509,
-        10140006
-      ]
-    },
-    {
-      "sector": "Household Products",
-      "netShareChange": [
-        null,
-        1259954,
-        23912
-      ]
-    },
-    {
-      "sector": "Industrial Manufacturing",
-      "netShareChange": [
-        null,
-        -176511,
-        -3585003
-      ]
-    },
-    {
-      "sector": "Industrial Products",
-      "netShareChange": [
-        null,
-        -2153713,
-        1178636
-      ]
-    },
-    {
-      "sector": "Insurance",
-      "netShareChange": [
-        null,
-        -9752186,
-        38811598
-      ]
-    },
-    {
-      "sector": "IT - Hardware",
-      "netShareChange": [
-        null,
-        304802,
-        479903
-      ]
-    },
-    {
-      "sector": "IT - Services",
-      "netShareChange": [
-        null,
-        -11132724,
-        8486263
-      ]
-    },
-    {
-      "sector": "IT - Software",
-      "netShareChange": [
-        null,
-        -10515749,
-        -19571324
-      ]
-    },
-    {
-      "sector": "Leisure Services",
-      "netShareChange": [
-        null,
-        -7833799,
-        18697827
-      ]
-    },
-    {
-      "sector": "Media",
-      "netShareChange": [
-        null,
-        6,
-        -153589
-      ]
-    },
-    {
-      "sector": "Metals & Minerals Trading",
-      "netShareChange": [
-        null,
-        1200729,
-        8172950
-      ]
-    },
-    {
-      "sector": "Minerals & Mining",
-      "netShareChange": [
-        null,
-        23760401,
-        -1245023
-      ]
-    },
-    {
-      "sector": "Non - Ferrous Metals",
-      "netShareChange": [
-        null,
-        36868592,
-        -12504002
-      ]
-    },
-    {
-      "sector": "Oil",
-      "netShareChange": [
-        null,
-        44147715,
-        27192065
-      ]
-    },
-    {
-      "sector": "Other Construction Materials",
-      "netShareChange": [
-        null,
-        5,
-        null
-      ]
-    },
-    {
-      "sector": "Other Consumer Services",
-      "netShareChange": [
-        null,
-        2962392,
-        -6195626
-      ]
-    },
-    {
-      "sector": "Other Utilities",
-      "netShareChange": [
-        null,
-        245539,
-        -9067
-      ]
-    },
-    {
-      "sector": "Paper, Forest & Jute Products",
-      "netShareChange": [
-        null,
-        1928375,
-        -70882
-      ]
-    },
-    {
-      "sector": "Personal Products",
-      "netShareChange": [
-        null,
-        -3123377,
-        3395152
-      ]
-    },
-    {
-      "sector": "Petroleum Products",
-      "netShareChange": [
-        null,
-        20563834,
-        17114182
-      ]
-    },
-    {
-      "sector": "Pharmaceuticals & Biotechnology",
-      "netShareChange": [
-        null,
-        14004902,
-        10042774
-      ]
-    },
-    {
-      "sector": "Pharmaceuticals and Biotechnology",
-      "netShareChange": [
-        null,
-        -218729,
-        -50000
-      ]
-    },
-    {
-      "sector": "Power",
-      "netShareChange": [
-        null,
-        65301666,
-        43071818
-      ]
-    },
-    {
-      "sector": "Realty",
-      "netShareChange": [
-        null,
-        -3739509,
-        6648028
-      ]
-    },
-    {
-      "sector": "Retailing",
-      "netShareChange": [
-        null,
-        25997794,
-        87398499
-      ]
-    },
-    {
-      "sector": "Telecom - Equipment & Accessories",
-      "netShareChange": [
-        null,
-        586601,
-        1248749
-      ]
-    },
-    {
-      "sector": "Telecom - Services",
-      "netShareChange": [
-        null,
-        63395601,
-        -50855163
-      ]
-    },
-    {
-      "sector": "Textiles & Apparels",
-      "netShareChange": [
-        null,
-        -1007936,
-        2364219
-      ]
-    },
-    {
-      "sector": "Transport Infrastructure",
-      "netShareChange": [
-        null,
-        -12665950,
-        -8796571
-      ]
-    },
-    {
-      "sector": "Transport Services",
-      "netShareChange": [
-        null,
-        16648877,
-        1358686
+        65547205,
+        43062751
       ]
     }
   ]

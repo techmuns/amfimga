@@ -4,6 +4,7 @@ import { loadStockDetail, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale } from "../lib/palette";
 import { DASH, formatCount, formatPercent, formatSignedCount } from "../lib/format";
+import { CapPill } from "./caps";
 import { LineChart, NetBars, Sparkline } from "./charts";
 import { ThemeToggle } from "./ThemeToggle";
 import { useTooltip } from "./Tooltip";
@@ -59,11 +60,14 @@ function Detail({ summary, detail }: { summary: SummaryMeta; detail: StockDetail
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="t-title">{detail.name}</h1>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span className="sec-dot" style={{ background: scale.colorOf(detail.sector) }} />
+          <span className="sec-dot" style={{ background: scale.colorOf(detail.macroSector) }} />
           <span className="t-label" style={{ color: "var(--ink-2)" }}>{detail.sector ?? DASH}</span>
         </span>
+        <CapPill cap={detail.marketCap} />
       </div>
-      <div className="t-muted" style={{ marginTop: 2 }}>{detail.isin}</div>
+      <div className="t-muted" style={{ marginTop: 2 }}>
+        {detail.isin}{detail.macroSector ? ` · ${detail.macroSector}` : ""}
+      </div>
 
       {/* Inline summary line — no stat cards */}
       <div className="t-body" style={{ marginTop: 12, color: "var(--ink-2)" }}>

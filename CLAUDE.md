@@ -113,7 +113,13 @@ NEVER treated as a sell-to-zero. Each month records how many houses it is based
 on. So the per-month *total* shares can rise while the coverage-aware *net
 change* is negative (a house appearing is not buying).
 
-Market cap (large/mid/small) is left `null` until the AMFI list is added later.
+Each stock also carries a broad **macro sector** (`macroSector`, ~12 AMFI-style
+groups collapsed from the ~60 granular NSE industries in `derive.ts`) used for
+the colour chips, sector filter, and sector chart — the granular `sector` stays
+on the detail page. And a **market cap** (`marketCap`: large/mid/small) from
+AMFI's half-yearly list, matched by ISIN: `scripts/marketcap.ts` (`npm run
+marketcap`) fetches the latest list → `data/marketcap.json` (not served); derive
+tags each stock, leaving `null` when not confidently matched (never guessed).
 
 ## Tech stack
 

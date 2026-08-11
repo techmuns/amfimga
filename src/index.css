@@ -123,6 +123,13 @@
   }
   .link:hover { color: var(--ink); text-decoration: underline; }
 
+  /* market-cap label */
+  .cap-pill {
+    font-size: 11px; font-weight: 600; color: var(--ink-2);
+    border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; white-space: nowrap;
+  }
+  .cap-none { font-size: 11px; color: var(--muted); }
+
   .panel {
     background: var(--surface);
     border: 1px solid var(--border);
