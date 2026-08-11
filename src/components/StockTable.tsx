@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { MarketCap, StockRow, StocksSummary } from "../types/holdings";
 import type { SectorScale } from "../lib/palette";
-import { DASH, formatCount, formatSignedCount } from "../lib/format";
+import { DASH, formatCount, formatCountShort, formatSignedCount } from "../lib/format";
 import { navigate } from "../lib/router";
 import { CapFilter, CapPill, capPass } from "./caps";
 import { Sparkline } from "./charts";
@@ -268,7 +268,7 @@ function Row({
       >
         <Sparkline values={s.totalShares} />
       </div>
-      <div className="cell-r t-body num">{formatCount(shares)}</div>
+      <div className="cell-r t-body num">{formatCountShort(shares)}</div>
       <div
         style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "center", cursor: cov.length ? "help" : "default" }}
         onMouseEnter={(e) => tt.show(netTip, e.clientX, e.clientY)}

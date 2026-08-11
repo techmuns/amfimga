@@ -13,7 +13,7 @@ type State =
   | { status: "error"; reason: string }
   | { status: "ready"; summary: SummaryMeta; stocks: StocksSummary };
 
-export function IdeasPage() {
+export function IdeasPage({ embedded }: { embedded?: boolean }) {
   const [state, setState] = useState<State>({ status: "loading" });
   useEffect(() => {
     let cancelled = false;
@@ -25,12 +25,14 @@ export function IdeasPage() {
 
   return (
     <>
-      <div className="mb-5 flex items-center justify-between">
-        <button className="link t-body" onClick={() => navigate("/")}>← Dashboard</button>
-        <ThemeToggle />
-      </div>
-      <h1 className="t-title">Ideas</h1>
-      <div className="t-muted" style={{ marginTop: 3 }}>Where the opportunities are hiding this month — each list is sortable, click a stock for detail.</div>
+      {!embedded && (
+        <div className="mb-5 flex items-center justify-between">
+          <button className="link t-body" onClick={() => navigate("/")}>← Overview</button>
+          <ThemeToggle />
+        </div>
+      )}
+      <h1 className="t-page">Ideas</h1>
+      <div className="t-muted" style={{ marginTop: 3 }}>Where the opportunities are hiding this month — each list is sortable; click a stock for detail.</div>
       {state.status === "loading" && <p className="t-muted" style={{ marginTop: 20 }}>Loading…</p>}
       {state.status === "error" && <p className="t-body" style={{ marginTop: 20, color: "var(--sell)" }}>Couldn&apos;t load data: {state.reason}</p>}
       {state.status === "ready" && <Ideas summary={state.summary} stocks={state.stocks} />}
@@ -64,82 +66,95 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
   const trendCol: Col = { label: "Trend", render: spark };
   const netCol: Col = { label: "Net change", align: "right", sortValue: (r) => r.netShareChange[L], render: (r) => <Change v={r.netShareChange[L]} note={coverageNote(r)} /> };
 
+  const [sub, setSub] = useState(0);
+  const SUBS = ["Buying & selling", "Brand-new entries", "Turned around", "Held by few funds"];
+
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2" style={{ margin: "18px 0 2px" }}>
+      <nav className="subtabs" style={{ marginTop: 16 }}>
+        {SUBS.map((s, i) => (
+          <button key={s} className="subtab" data-active={sub === i} onClick={() => setSub(i)}>{s}</button>
+        ))}
+      </nav>
+      <div className="flex flex-wrap items-center gap-2" style={{ margin: "14px 0 2px" }}>
         <span className="t-muted">Market cap:</span>
         <CapFilter selected={capSel} onToggle={toggleCap} />
       </div>
-      {/* 1 */}
-      <Section title="Funds are buying / selling these" subtitle="The biggest net buys and net sells this month. The more funds moving the same way, the broader the signal.">
-        <SubLabel color="var(--buy)">Buying</SubLabel>
-        <RankedTable
-          rows={buys}
-          grid="minmax(190px,2fr) 150px 140px 76px"
-          initialSort={1} initialDir={-1}
-          columns={[stockCol, netCol, { label: "Funds", align: "right", sortValue: (r) => r.fundsBuying ?? null, render: (r) => <AddTrim r={r} /> }, trendCol]}
-        />
-        <SubLabel color="var(--sell)" top>Selling</SubLabel>
-        <RankedTable
-          rows={sells}
-          grid="minmax(190px,2fr) 150px 140px 76px"
-          initialSort={1} initialDir={1}
-          columns={[stockCol, netCol, { label: "Funds", align: "right", sortValue: (r) => r.fundsSelling ?? null, render: (r) => <AddTrim r={r} /> }, trendCol]}
-        />
-      </Section>
 
-      {/* 2 */}
-      <Section title="Brand-new to mutual funds" subtitle={`Stocks funds started holding this month. Our data starts ${firstMonth}, so “new” means first seen since then — coverage changes are excluded.`}>
-        {newEntries.length === 0 ? (
-          <Empty>No brand-new entries this month.</Empty>
-        ) : (
+      {sub === 0 && (
+        <Section title="Funds are buying / selling these" subtitle="The biggest net buys and net sells this month. The more funds moving the same way, the broader the signal.">
+          <SubLabel color="var(--buy)">Buying</SubLabel>
           <RankedTable
-            rows={newEntries}
-            grid="minmax(220px,2fr) 120px 150px 76px"
+            rows={buys}
+            grid="minmax(190px,2fr) 150px 140px 76px"
             initialSort={1} initialDir={-1}
-            columns={[
-              stockCol,
-              { label: "Funds now", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
-              netCol,
-              trendCol,
-            ]}
+            columns={[stockCol, netCol, { label: "Funds", align: "right", sortValue: (r) => r.fundsBuying ?? null, render: (r) => <AddTrim r={r} /> }, trendCol]}
           />
-        )}
-      </Section>
-
-      {/* 3 */}
-      <Section title="Turned around" subtitle="Flow flipped direction — net selling then net buying, or the reverse. The sparkline shows the turn; this gets richer after more months of history.">
-        {turned.length === 0 ? (
-          <Empty>No turnarounds yet — needs a few months of history.</Empty>
-        ) : (
+          <SubLabel color="var(--sell)" top>Selling</SubLabel>
           <RankedTable
-            rows={turned}
-            grid="minmax(200px,2fr) 140px 140px 76px"
-            initialSort={2} initialDir={-1}
+            rows={sells}
+            grid="minmax(190px,2fr) 150px 140px 76px"
+            initialSort={1} initialDir={1}
+            columns={[stockCol, netCol, { label: "Funds", align: "right", sortValue: (r) => r.fundsSelling ?? null, render: (r) => <AddTrim r={r} /> }, trendCol]}
+          />
+        </Section>
+      )}
+
+      {sub === 1 && (
+        <Section title="Brand-new to mutual funds" subtitle={`Stocks funds started holding this month. Our data starts ${firstMonth}, so “new” means first seen since then — coverage changes are excluded.`}>
+          {newEntries.length === 0 ? (
+            <Empty>No brand-new entries this month.</Empty>
+          ) : (
+            <RankedTable
+              rows={newEntries}
+              grid="minmax(220px,2fr) 120px 150px 76px"
+              initialSort={1} initialDir={-1}
+              columns={[
+                stockCol,
+                { label: "Funds now", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
+                netCol,
+                trendCol,
+              ]}
+            />
+          )}
+        </Section>
+      )}
+
+      {sub === 2 && (
+        <Section title="Turned around" subtitle="Flow flipped direction — net selling then net buying, or the reverse. The sparkline shows the turn; this gets richer after more months of history.">
+          {turned.length === 0 ? (
+            <Empty>No turnarounds yet — needs a few months of history.</Empty>
+          ) : (
+            <RankedTable
+              rows={turned}
+              grid="minmax(200px,2fr) 140px 140px 76px"
+              initialSort={2} initialDir={-1}
+              columns={[
+                stockCol,
+                { label: "Last month", align: "right", render: (r) => <Change v={r.netShareChange[L - 1]} /> },
+                { label: "This month", align: "right", sortValue: (r) => r.netShareChange[L], render: (r) => <Change v={r.netShareChange[L]} /> },
+                trendCol,
+              ]}
+            />
+          )}
+        </Section>
+      )}
+
+      {sub === 3 && (
+        <Section title="Held by only a few funds" subtitle="Under-owned names — held by just 1–3 funds, or where one fund owns most of the fund-held shares. The contrarian / unique picks.">
+          <RankedTable
+            rows={fewFunds}
+            grid="minmax(200px,2fr) 90px minmax(150px,1fr) 76px"
+            initialSort={1} initialDir={1}
             columns={[
               stockCol,
-              { label: "Last month", align: "right", render: (r) => <Change v={r.netShareChange[L - 1]} /> },
-              { label: "This month", align: "right", sortValue: (r) => r.netShareChange[L], render: (r) => <Change v={r.netShareChange[L]} /> },
+              { label: "Funds", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
+              { label: "Biggest holder", sortValue: (r) => r.topHolder?.sharePct ?? null, render: (r) => <TopHolder r={r} /> },
               trendCol,
             ]}
           />
-        )}
-      </Section>
-
-      {/* 4 */}
-      <Section title="Held by only a few funds" subtitle="Under-owned names — held by just 1–3 funds, or where one fund owns most of the fund-held shares. The contrarian / unique picks.">
-        <RankedTable
-          rows={fewFunds}
-          grid="minmax(200px,2fr) 90px minmax(150px,1fr) 76px"
-          initialSort={1} initialDir={1}
-          columns={[
-            stockCol,
-            { label: "Funds", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
-            { label: "Biggest holder", sortValue: (r) => r.topHolder?.sharePct ?? null, render: (r) => <TopHolder r={r} /> },
-            trendCol,
-          ]}
-        />
-      </Section>
+        </Section>
+      )}
     </div>
   );
 }

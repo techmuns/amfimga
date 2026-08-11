@@ -221,9 +221,18 @@ AdvisorKhoj scraper (`scripts/ingest.ts` / `ingest.yml`):
 Build this project one step at a time. Everything is EQUITY only (derive keeps
 ISINs whose security-type is "01"). The UI follows a fixed design system (tokens
 in `src/index.css`: one font, standardized sizes, the palette, sector colours,
-chart-mark rules) — use it exactly; never invent colours or fonts. Client routing
-is path-based (`/` dashboard, `/stock/<ISIN>` detail, `/ideas` idea lists,
-`/funds` picker, `/fund/<key>` per-fund/house view). All nine steps are done
-(setup → ingestion → derived signals → dashboard → detail → ideas → macro/cap →
-full ~50-house data via AMFIBEAS → per-fund view). When in doubt, keep the five
-rules, the data shape, and the design system intact.
+chart-mark rules) — use it exactly; never invent colours or fonts. The app is
+**tabbed**, path-based: `/` Overview (macro flows only), `/stocks` the table,
+`/funds` the picker, `/ideas` the idea lists (with subtabs — the biggest-mover
+leaderboards live ONLY here), plus `/stock/<ISIN>` and `/fund/<key>` detail pages.
+Numbers use one format everywhere: crore/lakh and percents to 1 decimal, counts
+as integers, always a +/− sign and ▲/▼ on changes, "—" for unknown.
+
+**Export** is presentation-only (never touches data/analysis; `src/lib/report.ts`
+aggregates the existing summaries): **Excel** (`exportExcel.ts`, `exceljs`
+lazy-loaded, formatted multi-sheet .xlsx) and **PDF** (`exportPdf.ts`, an
+editorial "report edition" broadsheet — cream paper, self-hosted Playfair Display
++ Source Serif 4 in `public/fonts/`, printed to PDF via `@page`). All steps are
+done (setup → ingestion → derived signals → dashboard → detail → ideas →
+macro/cap → full ~50-house data via AMFIBEAS → per-fund view → polish + export).
+When in doubt, keep the five rules, the data shape, and the design system intact.

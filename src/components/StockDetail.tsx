@@ -3,7 +3,7 @@ import type { FundTrend, StockDetail, SummaryMeta } from "../types/holdings";
 import { fundFileKey, loadStockDetail, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale } from "../lib/palette";
-import { DASH, formatCount, formatPercent, formatSignedCount } from "../lib/format";
+import { DASH, formatCount, formatCountShort, formatPercent, formatSignedCount } from "../lib/format";
 import { CapPill } from "./caps";
 import { LineChart, NetBars, Sparkline } from "./charts";
 import { ThemeToggle } from "./ThemeToggle";
@@ -33,7 +33,7 @@ export function StockDetailPage({ isin }: { isin: string }) {
   return (
     <>
       <div className="mb-5 flex items-center justify-between">
-        <button className="link t-body" onClick={() => navigate("/")}>← All stocks</button>
+        <button className="link t-body" onClick={() => navigate("/stocks")}>← Stocks</button>
         <ThemeToggle />
       </div>
       {state.status === "loading" && <p className="t-muted">Loading…</p>}
@@ -71,7 +71,7 @@ function Detail({ summary, detail }: { summary: SummaryMeta; detail: StockDetail
 
       {/* Inline summary line — no stat cards */}
       <div className="t-body" style={{ marginTop: 12, color: "var(--ink-2)" }}>
-        <strong style={{ color: "var(--ink)" }}>{formatCount(detail.totalShares[last])}</strong> shares held ·{" "}
+        <strong style={{ color: "var(--ink)" }}>{formatCountShort(detail.totalShares[last])}</strong> shares held ·{" "}
         <span style={{ color: net == null ? "var(--muted)" : net >= 0 ? "var(--buy)" : "var(--sell)", fontWeight: 600 }}>
           {net == null ? DASH : <>{net >= 0 ? "▲" : "▼"} {formatSignedCount(net)}</>}
         </span>{" "}
@@ -203,7 +203,7 @@ function FundRow({ f, last, labels, tt }: { f: FundTrend; last: number; labels: 
           <div className="t-muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fundHouse}</div>
         )}
       </div>
-      <div className="cell-r t-body num">{formatCount(f.shares[last])}</div>
+      <div className="cell-r t-body num">{formatCountShort(f.shares[last])}</div>
       <div
         className="cell-r t-body num"
         style={{ color: c == null ? "var(--muted)" : buy ? "var(--buy)" : sell ? "var(--sell)" : "var(--ink-2)", cursor: changeMsg ? "help" : "default" }}

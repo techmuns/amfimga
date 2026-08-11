@@ -18,6 +18,7 @@
     "data:amfibeas": "npm run ingest:amfibeas && npm run marketcap && npm run derive"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

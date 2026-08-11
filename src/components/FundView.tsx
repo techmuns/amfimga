@@ -3,7 +3,7 @@ import type { FundDetail, FundHoldingTrend, FundsIndex, SummaryMeta } from "../t
 import { loadFundDetail, loadFundsIndex, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
-import { DASH, formatCount, formatInr, formatPercent, formatSignedCount } from "../lib/format";
+import { DASH, formatCount, formatCountShort, formatInr, formatPercent, formatSignedCount } from "../lib/format";
 import { CapPill } from "./caps";
 import { Sparkline } from "./charts";
 import { ThemeToggle } from "./ThemeToggle";
@@ -81,7 +81,7 @@ type IdxState =
   | { status: "error"; reason: string }
   | { status: "ready"; index: FundsIndex };
 
-export function FundsPage() {
+export function FundsPage({ embedded }: { embedded?: boolean }) {
   const [state, setState] = useState<IdxState>({ status: "loading" });
   useEffect(() => {
     let off = false;
@@ -93,15 +93,17 @@ export function FundsPage() {
 
   return (
     <>
-      <div className="mb-5 flex items-center justify-between">
-        <button className="link t-body" onClick={() => navigate("/")}>← Dashboard</button>
-        <ThemeToggle />
-      </div>
+      {!embedded && (
+        <div className="mb-5 flex items-center justify-between">
+          <button className="link t-body" onClick={() => navigate("/")}>← Overview</button>
+          <ThemeToggle />
+        </div>
+      )}
       {state.status === "loading" && <p className="t-muted">Loading…</p>}
       {state.status === "error" && <p className="t-body" style={{ color: "var(--sell)" }}>Couldn&apos;t load the funds list: {state.reason}</p>}
       {state.status === "ready" && (
         <>
-          <h1 className="t-title">Funds &amp; fund houses</h1>
+          <h1 className="t-page">Funds &amp; fund houses</h1>
           <div className="t-muted" style={{ marginTop: 3, marginBottom: 16 }}>
             Pick a scheme to see what it&apos;s buying and selling — or a whole fund house, rolled up. {state.index.monthLabel} · {state.index.entries.filter((e) => e.kind === "house").length} houses · {state.index.entries.filter((e) => e.kind === "fund").length} schemes.
           </div>
@@ -397,7 +399,7 @@ function HoldRow({ h, last, labels, scale, comparable, tt }: {
         <span className="sec-dot" style={{ background: scale.colorOf(h.macroSector) }} />
         <span className="t-body" style={{ color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.macroSector ?? DASH}</span>
       </div>
-      <div className="cell-r t-body num">{formatCount(h.shares[last])}</div>
+      <div className="cell-r t-body num">{formatCountShort(h.shares[last])}</div>
       <div className="cell-r t-body num">{formatPercent(h.percent[last])}</div>
       <div className="cell-r t-body num"
         style={{ color: c == null ? "var(--muted)" : buy ? "var(--buy)" : sell ? "var(--sell)" : "var(--ink-2)", cursor: changeMsg ? "help" : "default" }}

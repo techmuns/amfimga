@@ -222,4 +222,48 @@
   .theme-btn { padding: 5px 10px; cursor: pointer; font-weight: 600; }
   .searchbox { padding: 6px 10px; }
   .searchbox::placeholder { color: var(--muted); }
+
+  /* ---- type scale (large page titles) ---- */
+  .t-page { font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: -0.015em; }
+
+  /* ---- top bar + tabs ---- */
+  .topbar { display: flex; align-items: flex-start; gap: 12px; }
+  .brand { display: flex; flex-direction: column; min-width: 0; }
+  .brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .tabs { display: flex; gap: 4px; margin-top: 14px; border-bottom: 1px solid var(--border); }
+  .tab {
+    background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    padding: 8px 14px; font-size: 14px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[data-active="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+
+  /* ---- subtabs (under Ideas) ---- */
+  .subtabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .subtab {
+    background: transparent; border: 1px solid var(--border); border-radius: 999px;
+    padding: 5px 13px; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+  }
+  .subtab:hover { color: var(--ink); }
+  .subtab[data-active="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+
+  /* ---- export menu ---- */
+  .menu { position: absolute; right: 0; top: 34px; z-index: 40; padding: 4px; min-width: 148px; box-shadow: 0 6px 24px rgba(0,0,0,.14); }
+  .menu-item {
+    display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px;
+    padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer;
+  }
+  .menu-item:hover:not(:disabled) { background: var(--flat); }
+  .menu-item:disabled { color: var(--muted); cursor: default; }
+
+  /* ---- overview ---- */
+  .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ov-panel { padding: 16px 18px; margin-bottom: 16px; }
+  .ov-grid .ov-panel { margin-bottom: 0; }
+  @media (max-width: 760px) { .ov-grid { grid-template-columns: 1fr; } }
+  .breadth-row { display: grid; grid-template-columns: 96px 1fr 64px; align-items: center; column-gap: 10px; cursor: default; }
+  .breadth-label { font-size: 13px; font-weight: 600; }
+  .breadth-track { height: 12px; background: var(--flat); border-radius: 3px; overflow: hidden; }
+  .breadth-fill { display: block; height: 100%; border-radius: 3px; }
 }

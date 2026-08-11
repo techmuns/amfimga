@@ -18,15 +18,15 @@ export function formatInr(rupees: number | null | undefined): string {
   if (rupees == null || !Number.isFinite(rupees)) return DASH;
   const sign = rupees < 0 ? "-" : "";
   const abs = Math.abs(rupees);
-  if (abs >= 1e7) return `${sign}₹${(abs / 1e7).toFixed(2)} Cr`;
-  if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(2)} L`;
+  if (abs >= 1e7) return `${sign}₹${(abs / 1e7).toFixed(1)} Cr`;
+  if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(1)} L`;
   return `${sign}₹${abs.toLocaleString("en-IN")}`;
 }
 
-/** Format a percentage, e.g. 8.42 → "8.42%". Returns {@link DASH} for null/unknown. */
+/** Format a percentage with exactly one decimal, e.g. 8.42 → "8.4%". Dash if unknown. */
 export function formatPercent(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return DASH;
-  return `${value.toFixed(2)}%`;
+  return `${value.toFixed(1)}%`;
 }
 
 /** Format a whole-number count with grouping, e.g. 1200000 → "12,00,000". Dash if unknown. */
@@ -50,6 +50,16 @@ export function formatCountShort(value: number | null | undefined): string {
  * Returns {@link DASH} for null/unknown — a coverage gap is never shown as 0.
  */
 export function formatSignedCount(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return DASH;
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1e7) return `${sign}${(abs / 1e7).toFixed(1)} Cr`;
+  if (abs >= 1e5) return `${sign}${(abs / 1e5).toFixed(1)} L`;
+  return `${sign}${abs.toLocaleString("en-IN")}`;
+}
+
+/** Exact whole-share count with a sign, for tooltips where precision matters. */
+export function formatSignedExact(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return DASH;
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   return `${sign}${Math.abs(value).toLocaleString("en-IN")}`;
