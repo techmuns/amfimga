@@ -63,7 +63,7 @@ and `fundHouse` (the AMC), so holdings can be rolled up by fund house.
 
 **Two tiers of data:**
 
-- **Raw months (NOT served)** — `data/months/<YYYY-MM>.json`: the full holdings,
+- **Raw months (NOT served)** — `data/months/<YYYY-MM>.json.gz` (gzipped): the full holdings,
   `{ month, source, generatedAt?, coverage?, funds: [...] }`. `coverage` records
   each fund house's ingestion outcome (Rule 5). These are big; the browser never
   loads them. They live outside `public/` on purpose.
@@ -134,7 +134,7 @@ tags each stock, leaving `null` when not confidently matched (never guessed).
 
 ```
 worker/index.ts            Cloudflare Worker: static-asset pass-through (no auth)
-scripts/ingest.ts          Ingestion: download + parse → data/months/<YYYY-MM>.json
+scripts/ingest.ts          Ingestion: download + parse → data/months/<YYYY-MM>.json.gz
 scripts/derive.ts          Derive: raw months → small summaries in public/data
 .github/workflows/ingest.yml  Monthly ingest + derive
 data/months/               Raw month files (NOT served; input to derive)

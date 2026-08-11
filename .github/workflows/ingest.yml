@@ -1,22 +1,26 @@
 name: Monthly data ingestion
 
-# Pulls the newest monthly fund-holdings disclosures and commits the resulting
-# data files. Runs on the 16th of each month (after fund houses publish the
-# prior month's disclosures), and can be triggered by hand for any month.
+# Pulls monthly fund-holdings disclosures and commits the derived data.
+#  - Scheduled (16th): fetch the latest full month.
+#  - Manual "backfill": set months_back to pull the last N months across every
+#    fund house, using the scrape.do / firecrawl secrets for bot-walled houses.
+# Resumable: already-downloaded (house, month) pairs are skipped, and each month
+# is committed as it finishes, so a re-run continues where a timed-out run left
+# off. Logs print counts/statuses only — never security names, money, or keys.
 
 on:
   schedule:
     - cron: "0 6 16 * *" # 06:00 UTC on the 16th
   workflow_dispatch:
     inputs:
+      months_back:
+        description: 'Backfill the last N months across all fund houses (blank = latest month only)'
+        required: false
+        default: "18"
       month:
-        description: 'Month to ingest as YYYY-MM (blank = latest full month)'
+        description: 'Ingest a single month as YYYY-MM (overrides months_back)'
         required: false
         default: ""
-      backfill:
-        description: 'Ingest all of 2023-2026 instead (true/false)'
-        required: false
-        default: "false"
 
 permissions:
   contents: write
@@ -28,7 +32,7 @@ concurrency:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -39,17 +43,22 @@ jobs:
 
       - run: npm ci
 
-      - name: Run ingestion
+      - name: Configure git (for incremental backfill commits)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Ingest disclosures
         env:
           SCRAPEDO_API_KEY: ${{ secrets.SCRAPEDO_API_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
         run: |
-          if [ "${{ inputs.backfill }}" = "true" ]; then
-            npm run ingest -- --backfill --concurrency 4
-          elif [ -n "${{ inputs.month }}" ]; then
-            npm run ingest -- --month "${{ inputs.month }}" --concurrency 4
+          if [ -n "${{ inputs.month }}" ]; then
+            npm run ingest -- --month "${{ inputs.month }}" --skip-existing --commit-each --concurrency 4
+          elif [ -n "${{ inputs.months_back }}" ]; then
+            npm run ingest -- --months-back "${{ inputs.months_back }}" --skip-existing --commit-each --concurrency 4
           else
-            npm run ingest -- --latest --concurrency 4
+            npm run ingest -- --latest --skip-existing --commit-each --concurrency 4
           fi
 
       - name: Refresh AMFI market-cap list (half-yearly; non-fatal)
@@ -58,16 +67,14 @@ jobs:
       - name: Derive browser summaries
         run: npm run derive
 
-      - name: Commit updated data
+      - name: Commit derived summaries
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Raw months (data/months) + small summaries (public/data). The bulky
-          # per-stock detail files are git-ignored; they are regenerated on deploy.
-          git add data/months data/marketcap.json public/data
+          # Raw months are committed incrementally during ingest (--commit-each).
+          # Here we commit the market-cap list + small browser summaries.
+          git add data/marketcap.json public/data
           if git diff --cached --quiet; then
-            echo "No data changes to commit."
+            echo "No summary changes to commit."
           else
-            git commit -m "data: monthly ingestion ($(date -u +%Y-%m-%d))"
-            git push
+            git commit -m "data: derive summaries ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do git push && break || sleep $((2 ** i)); done
           fi

@@ -22,9 +22,11 @@
  * as a gap (never invented as zeros).
  */
 
-import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync, gunzipSync } from "node:zlib";
+import { execSync } from "node:child_process";
 import * as XLSX from "xlsx";
 import { ProxyAgent, setGlobalDispatcher } from "undici";
 import type {
@@ -388,21 +390,33 @@ function mergeFunds(
   return { funds, retainedSlugs };
 }
 
+// Raw months are stored gzip-compressed (data/months/<YYYY-MM>.json.gz) to keep
+// the repo lean. A plain .json is still read if present (older files / migration).
 function readMonth(month: string): MonthData | null {
-  const p = resolve(MONTHS_DIR, `${month}.json`);
-  if (!existsSync(p)) return null;
+  const gz = resolve(MONTHS_DIR, `${month}.json.gz`);
+  const plain = resolve(MONTHS_DIR, `${month}.json`);
   try {
-    return JSON.parse(readFileSync(p, "utf8")) as MonthData;
+    if (existsSync(gz)) return JSON.parse(gunzipSync(readFileSync(gz)).toString("utf8")) as MonthData;
+    if (existsSync(plain)) return JSON.parse(readFileSync(plain, "utf8")) as MonthData;
   } catch {
-    return null;
+    /* fall through */
   }
+  return null;
+}
+
+function writeMonth(month: string, out: MonthData): void {
+  mkdirSync(MONTHS_DIR, { recursive: true });
+  writeFileSync(resolve(MONTHS_DIR, `${month}.json.gz`), gzipSync(JSON.stringify(out) + "\n"));
+  rmSync(resolve(MONTHS_DIR, `${month}.json`), { force: true }); // drop any old uncompressed file
 }
 
 function listMonths(): string[] {
-  return readdirSync(MONTHS_DIR)
-    .filter((f) => /^\d{4}-\d{2}\.json$/.test(f))
-    .map((f) => f.replace(/\.json$/, ""))
-    .sort();
+  const set = new Set<string>();
+  for (const f of readdirSync(MONTHS_DIR)) {
+    const m = f.match(/^(\d{4}-\d{2})\.json(\.gz)?$/);
+    if (m) set.add(m[1]);
+  }
+  return [...set].sort();
 }
 
 // ---------------------------------------------------------------------------
@@ -413,29 +427,56 @@ interface Args {
   months: string[] | null; // explicit months, or null = derive
   latest: boolean;
   backfill: boolean;
+  monthsBack: number | null; // last N months from the latest full month
   year: number | null;
   amcFilter: string[];
   concurrency: number;
   dryRun: boolean;
+  skipExisting: boolean; // skip (house, month) pairs already downloaded — resumable
+  commitEach: boolean; // git commit + push after each month (incremental progress)
 }
 
 function parseArgs(argv: string[]): Args {
   const a: Args = {
-    months: null, latest: false, backfill: false, year: null,
-    amcFilter: [], concurrency: 4, dryRun: false,
+    months: null, latest: false, backfill: false, monthsBack: null, year: null,
+    amcFilter: [], concurrency: 4, dryRun: false, skipExisting: false, commitEach: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--latest") a.latest = true;
     else if (arg === "--backfill") a.backfill = true;
     else if (arg === "--dry-run") a.dryRun = true;
+    else if (arg === "--skip-existing") a.skipExisting = true;
+    else if (arg === "--commit-each") a.commitEach = true;
     else if (arg === "--month") (a.months ??= []).push(argv[++i]);
+    else if (arg === "--months-back") a.monthsBack = Math.max(1, Number(argv[++i]) || 12);
     else if (arg === "--year") a.year = Number(argv[++i]);
     else if (arg === "--amc") a.amcFilter.push(argv[++i]);
     else if (arg === "--concurrency") a.concurrency = Math.max(1, Number(argv[++i]) || 4);
   }
-  if (!a.months && !a.backfill && !a.year) a.latest = true;
+  if (!a.months && !a.backfill && !a.year && !a.monthsBack) a.latest = true;
   return a;
+}
+
+/** git add + commit + push the raw months dir, with retry/backoff. No-op if nothing changed. */
+function commitMonths(message: string): void {
+  try {
+    execSync("git add data/months", { stdio: "ignore" });
+    const changed = execSync("git status --porcelain data/months").toString().trim();
+    if (!changed) return;
+    execSync(`git commit -q -m ${JSON.stringify(message)}`, { stdio: "ignore" });
+  } catch {
+    return; // nothing to commit
+  }
+  for (let attempt = 0, delay = 2000; attempt < 4; attempt++) {
+    try {
+      execSync("git push", { stdio: "ignore" });
+      return;
+    } catch {
+      execSync(`sleep ${delay / 1000}`, { stdio: "ignore" });
+      delay *= 2;
+    }
+  }
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -454,12 +495,21 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 /** Ingest a single month across all (filtered) fund houses. */
 async function ingestMonth(month: string, amcs: Amc[], args: Args): Promise<void> {
   const year = Number(month.slice(0, 4));
-  console.log(`\n=== ${month} (${monthLabel(month)}) — ${amcs.length} fund houses ===`);
+  const existing = readMonth(month);
+
+  // Resumable: skip (house, month) pairs already downloaded successfully.
+  const presentSlugs = new Set((existing?.funds ?? []).map((f) => amcSlugOf(f.fundId)));
+  const toFetch = args.skipExisting ? amcs.filter((a) => !presentSlugs.has(a.slug)) : amcs;
+  const skipped = amcs.length - toFetch.length;
+  console.log(
+    `\n=== ${month} (${monthLabel(month)}) — ${amcs.length} houses` +
+      (skipped ? `, ${skipped} already present (skipped)` : "") + ` ===`,
+  );
 
   const coverage: AmcCoverage[] = [];
   const freshFunds: FundHoldings[] = [];
 
-  await mapLimit(amcs, args.concurrency, async (amc) => {
+  await mapLimit(toFetch, args.concurrency, async (amc) => {
     const base: AmcCoverage = {
       fundHouse: amc.name, amcSlug: amc.slug, status: "failed", schemes: 0, holdings: 0,
     };
@@ -493,13 +543,16 @@ async function ingestMonth(month: string, amcs: Amc[], args: Args): Promise<void
   const okCount = coverage.filter((c) => c.status === "ok").length;
   const holdingsTotal = coverage.reduce((n, c) => n + c.holdings, 0);
 
-  // Catastrophic-run guard: never overwrite a good file with nothing.
+  if (toFetch.length === 0) {
+    console.log(`  · ${month}: all ${presentSlugs.size} houses already present — nothing to do.`);
+    return;
+  }
+  // Guard: a run that fetched nothing usable never overwrites a good file.
   if (okCount === 0) {
-    console.log(`  ! ${month}: 0 fund houses succeeded — keeping any existing file untouched.`);
+    console.log(`  ! ${month}: 0 new fund houses succeeded — keeping any existing file untouched.`);
     return;
   }
 
-  const existing = readMonth(month);
   const { funds, retainedSlugs } = mergeFunds(existing, freshFunds);
 
   // Mark retained houses in coverage.
@@ -534,21 +587,15 @@ async function ingestMonth(month: string, amcs: Amc[], args: Args): Promise<void
     console.log("  (dry-run: not writing)");
     return;
   }
-  mkdirSync(MONTHS_DIR, { recursive: true });
-  writeFileSync(resolve(MONTHS_DIR, `${month}.json`), JSON.stringify(out, null, 2) + "\n");
+  writeMonth(month, out);
+  if (args.commitEach) {
+    commitMonths(`data: backfill ${month} (${okCount + retainedSlugs.size}/${amcs.length} houses)`);
+    console.log(`  ✓ committed ${month}`);
+  }
 }
 
-/** Determine which months to ingest based on args. */
-async function resolveMonths(args: Args, amcs: Amc[]): Promise<string[]> {
-  if (args.backfill) {
-    return YEARS.flatMap((y) => MONTHS.map((_, i) => `${y}-${String(i + 1).padStart(2, "0")}`));
-  }
-  if (args.year) {
-    return MONTHS.map((_, i) => `${args.year}-${String(i + 1).padStart(2, "0")}`);
-  }
-  if (args.months) return args.months;
-
-  // --latest: probe seed houses for the newest non-adhoc month available.
+/** Probe seed houses for the newest full (non-adhoc) month available. */
+async function latestFullMonth(amcs: Amc[]): Promise<string> {
   const probeYear = YEARS[YEARS.length - 1];
   const all: DisclosureLink[] = [];
   for (const amc of amcs.slice(0, 6)) {
@@ -561,7 +608,30 @@ async function resolveMonths(args: Args, amcs: Amc[]): Promise<string[]> {
   const full = all.filter((l) => !l.adhoc).map((l) => l.month).sort();
   const latest = full[full.length - 1];
   if (!latest) throw new Error("Could not determine the latest full month");
-  return [latest];
+  return latest;
+}
+
+/** Subtract `n` whole months from a "YYYY-MM". */
+function monthsBefore(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const idx = y * 12 + (m - 1) - n;
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
+}
+
+/** Determine which months to ingest, newest-first for the heavy modes. */
+async function resolveMonths(args: Args, amcs: Amc[]): Promise<string[]> {
+  if (args.monthsBack) {
+    const latest = await latestFullMonth(amcs);
+    return Array.from({ length: args.monthsBack }, (_, i) => monthsBefore(latest, i)); // newest first
+  }
+  if (args.backfill) {
+    return YEARS.flatMap((y) => MONTHS.map((_, i) => `${y}-${String(i + 1).padStart(2, "0")}`)).reverse();
+  }
+  if (args.year) {
+    return MONTHS.map((_, i) => `${args.year}-${String(i + 1).padStart(2, "0")}`).reverse();
+  }
+  if (args.months) return args.months;
+  return [await latestFullMonth(amcs)];
 }
 
 async function main() {

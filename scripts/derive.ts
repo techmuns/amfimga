@@ -23,6 +23,7 @@ import {
 } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 import type {
   MonthData,
   SummaryMeta,
@@ -118,16 +119,22 @@ function addKnown(a: number | null, b: number | null): number | null {
   return (a ?? 0) + (b ?? 0);
 }
 
+// Raw months are gzip-compressed (<YYYY-MM>.json.gz); a plain .json is still read
+// if present (migration). Newest last (sorted ascending).
 function loadMonths(): { month: string; data: MonthData }[] {
   if (!existsSync(MONTHS_DIR)) return [];
-  return readdirSync(MONTHS_DIR)
-    .filter((f) => /^\d{4}-\d{2}\.json$/.test(f))
-    .map((f) => f.replace(/\.json$/, ""))
-    .sort()
-    .map((month) => ({
-      month,
-      data: JSON.parse(readFileSync(resolve(MONTHS_DIR, `${month}.json`), "utf8")) as MonthData,
-    }));
+  const months = new Set<string>();
+  for (const f of readdirSync(MONTHS_DIR)) {
+    const m = f.match(/^(\d{4}-\d{2})\.json(\.gz)?$/);
+    if (m) months.add(m[1]);
+  }
+  return [...months].sort().map((month) => {
+    const gz = resolve(MONTHS_DIR, `${month}.json.gz`);
+    const raw = existsSync(gz)
+      ? gunzipSync(readFileSync(gz)).toString("utf8")
+      : readFileSync(resolve(MONTHS_DIR, `${month}.json`), "utf8");
+    return { month, data: JSON.parse(raw) as MonthData };
+  });
 }
 
 // Ordinary equity shares only (a decision from the start). In an Indian ISIN the
