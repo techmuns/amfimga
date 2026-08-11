@@ -4,8 +4,14 @@ A dashboard that tracks how India's mutual funds buy and sell stocks, month by
 month. Every month, mutual funds publicly disclose which stocks they hold and how
 many shares; by comparing one month to the next across the whole market (all fund
 houses, all stocks) we can see where the "smart money" is quietly moving in or
-out. Data originates from **AdvisorKhoj**, which links each fund house's official
-monthly holdings file (an `.xlsx` on the fund house's own site).
+out. Data originates from each fund house's official monthly disclosure. Two
+sources feed us: **AdvisorKhoj** links ~23 houses' `.xlsx` directly (our
+`scripts/ingest.ts` scraper), but the other ~26 (incl. HDFC, ICICI Prudential,
+Aditya Birla, DSP, Mirae, UTI) route through walled/JS site pages it can't reach.
+For full ~50-house coverage we import the already-parsed holdings from the sibling
+project **AMFIBEAS** (`github.com/techmuns/amfibeas`), which resolves every house's
+official disclosure with **no secret keys**; we merge its data into our months
+(see "Data ingestion"). AMFIBEAS is the primary, automated source.
 
 This file is the contract for the whole project. Read it before every step and
 keep changes consistent with it.
@@ -70,8 +76,10 @@ and `fundHouse` (the AMC), so holdings can be rolled up by fund house.
 - **Derived summaries (served, small)** — `public/data/…`: what the browser loads.
   Produced from the raw months by `scripts/derive.ts`.
 
-Adding a month = `npm run ingest` (writes `data/months/…`) then `npm run derive`
-(rebuilds the summaries). No app code change (Rule 1).
+Adding a month = `npm run ingest:amfibeas` (imports AMFIBEAS's full-coverage
+holdings → `data/months/…`) then `npm run derive` (rebuilds the summaries); the
+AdvisorKhoj scraper `npm run ingest` is the on-demand alternative for the ~23
+directly-linked houses. Either way, no app code change (Rule 1).
 
 ## Data ingestion
 
@@ -91,8 +99,25 @@ disclosures and writes month files:
 - Args: `--latest` (default), `--month YYYY-MM`, `--year YYYY`, `--backfill`
   (2023–2026), `--amc <slug>`, `--concurrency N`, `--dry-run`.
 
-`.github/workflows/ingest.yml` runs `--latest` monthly (16th), then `derive`, and
-commits the result. Uses proxy-aware fetch locally (`undici`) and direct in CI.
+`scripts/ingest-amfibeas.ts` (`npm run ingest:amfibeas`) is the **primary,
+full-coverage** source. It fetches AMFIBEAS's published per-house holdings
+(`public/amc-holdings/*.json` — all ~50 houses, no secret keys; a `--dir` points
+at a local checkout instead of GitHub), maps each house to our canonical
+AdvisorKhoj slug (so a house keeps ONE `amcSlug` across months **and** sources —
+derive groups coverage by that slug), converts values from ₹ crore to plain
+rupees (Rule 3), keeps only INE ISINs (Rule 4), and **merges per house** into
+`data/months/…`, never wiping a previously-good house (Rule 5). It clamps
+imported months to a sane window (AMFIBEAS's "as on" dates occasionally misparse).
+AMFIBEAS's history is shallow, so the newest month has the most houses (incl. the
+giants) and older months keep our deeper AdvisorKhoj history.
+
+Workflows (both use proxy-aware `undici` locally, direct egress in CI):
+- `.github/workflows/sync-amfibeas.yml` — the scheduled monthly job (10th–15th,
+  just after AMFIBEAS refreshes): import → `marketcap` → `derive` → commit. Needs
+  **no secrets**. Also `workflow_dispatch` + a `repository_dispatch`
+  (`amfibeas-updated`) hook so AMFIBEAS can trigger a near-real-time sync.
+- `.github/workflows/ingest.yml` — the AdvisorKhoj + scrape.do scraper, kept as an
+  on-demand independent source (`workflow_dispatch` only).
 
 ## Derived summaries
 
@@ -134,11 +159,13 @@ tags each stock, leaving `null` when not confidently matched (never guessed).
 
 ```
 worker/index.ts            Cloudflare Worker: static-asset pass-through (no auth)
-scripts/ingest.ts          Ingestion: download + parse → data/months/<YYYY-MM>.json.gz
+scripts/ingest-amfibeas.ts Primary source: import AMFIBEAS holdings (all ~50 houses) → data/months/…
+scripts/ingest.ts          AdvisorKhoj scraper (on-demand): download + parse → data/months/<YYYY-MM>.json.gz
 scripts/derive.ts          Derive: raw months → small summaries in public/data
-.github/workflows/ingest.yml  Monthly ingest + derive
+.github/workflows/sync-amfibeas.yml  Monthly AMFIBEAS sync + derive (primary; no secrets)
+.github/workflows/ingest.yml  AdvisorKhoj ingest + derive (on-demand)
 data/months/               Raw month files (NOT served; input to derive)
-  <YYYY-MM>.json           One month, all fund houses (produced by ingestion)
+  <YYYY-MM>.json.gz        One month, all fund houses (gzipped; produced by ingestion)
 src/
   main.tsx                 React entry
   App.tsx                  Home page: top net buys/sells + coverage
@@ -164,12 +191,18 @@ npm run dev       # Vite dev server + Worker (Miniflare)
 npm run build     # tsc -b (type-check) + vite build → dist/
 npm run preview   # Serve the production build through the Worker locally
 npm run deploy    # derive, build, then wrangler deploy
-npm run ingest -- --latest    # download the latest full month → data/months/
+npm run ingest:amfibeas       # PRIMARY: import AMFIBEAS full-coverage holdings → data/months/
+npm run data:amfibeas         # ingest:amfibeas, then marketcap, then derive
+npm run ingest -- --latest    # AdvisorKhoj scraper (on-demand): latest full month → data/months/
 npm run derive                # rebuild the browser summaries from data/months/
 npm run data                  # ingest --latest, then derive
 ```
 
 ## Ingestion secrets
+
+The primary source (`ingest:amfibeas` / `sync-amfibeas.yml`) needs **no secrets** —
+AMFIBEAS's holdings are public JSON. The secrets below only apply to the on-demand
+AdvisorKhoj scraper (`scripts/ingest.ts` / `ingest.yml`):
 
 - `SCRAPEDO_API_KEY` — unlocks fund houses behind a bot-wall. Optional locally
   (copy `.env.example` → `.env`); set as a repo secret for the CI workflow.

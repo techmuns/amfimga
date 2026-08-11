@@ -1,0 +1,67 @@
+name: Sync holdings from AMFIBEAS
+
+# Pulls the sibling project AMFIBEAS's already-parsed holdings — all ~50 fund
+# houses including the ones our own AdvisorKhoj scraper can't reach (HDFC, ICICI
+# Prudential, Aditya Birla, DSP, Mirae, UTI, …) — and MERGES them per fund house
+# into our raw month files, then re-derives the browser summaries. No secret keys
+# are needed: AMFIBEAS publishes public JSON at
+# raw.githubusercontent.com/techmuns/amfibeas/main/public/amc-holdings.
+#
+# AMFIBEAS refreshes monthly (9th–12th, as houses publish the prior month); this
+# runs just after, so AMFIBEAS's new data flows through to us automatically. It
+# is resumable and safe to re-run: the import only fills gaps and never wipes a
+# previously-good house (merge-not-clobber, Rule 5).
+
+on:
+  schedule:
+    - cron: "0 9 10-15 * *" # daily 10th–15th, 09:00 UTC (shortly after AMFIBEAS)
+  workflow_dispatch:
+  repository_dispatch:
+    types: [amfibeas-updated] # lets AMFIBEAS notify us for near-real-time sync
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-ingestion # shared with ingest.yml so the two never write at once
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Import AMFIBEAS holdings (fetch public JSON, merge per fund house)
+        run: npm run ingest:amfibeas -- --commit
+
+      - name: Refresh AMFI market-cap list (half-yearly; non-fatal)
+        run: npm run marketcap || echo "marketcap refresh failed — keeping existing data/marketcap.json"
+
+      - name: Derive browser summaries
+        run: npm run derive
+
+      - name: Commit derived summaries
+        run: |
+          # Raw months are committed during import (--commit). Here we commit the
+          # market-cap list + the small browser summaries.
+          git add data/marketcap.json public/data
+          if git diff --cached --quiet; then
+            echo "No summary changes to commit."
+          else
+            git commit -m "data: derive summaries ($(date -u +%Y-%m-%d))"
+            for i in 1 2 3 4; do git push && break || sleep $((2 ** i)); done
+          fi
