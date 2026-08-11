@@ -32,6 +32,11 @@ import type {
   StockDetail,
   FundTrend,
   SectorSummary,
+  MarketCap,
+  FundsIndex,
+  FundIndexEntry,
+  FundDetail,
+  FundHoldingTrend,
 } from "../src/types/holdings.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -39,7 +44,12 @@ const ROOT = resolve(HERE, "..");
 const MONTHS_DIR = resolve(ROOT, "data/months");
 const OUT_DIR = resolve(ROOT, "public/data");
 const DETAIL_DIR = resolve(OUT_DIR, "stocks");
+const FUNDS_DIR = resolve(OUT_DIR, "funds");
 const SCHEMA = 1;
+
+/** URL-/file-safe key for a fund or house detail file. Mirrored in src/lib/funds.ts. */
+const fundFileKey = (kind: "fund" | "house", id: string): string =>
+  `${kind}__${id}`.replace(/[^A-Za-z0-9._-]/g, "_");
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -436,10 +446,149 @@ function main(): void {
     }
   }
 
+  // ---- Per-fund & per-house details (Step 9) ----
+  // The flip side of the stock page. Coverage-aware: a holding's monthly change
+  // is only computed when the fund/house is present in BOTH months.
+  const fundIndex: FundIndexEntry[] = [];
+  const fundDetails: FundDetail[] = [];
+
+  const buildEntity = (
+    kind: "fund" | "house",
+    id: string,
+    amcSlug: string,
+    name: string,
+    house: string,
+  ): FundDetail => {
+    // Per-month aggregated holdings for this entity (a fund = one scheme; a house
+    // = the sum across all its schemes), plus whether it was present each month.
+    const perMonth: Map<string, { shares: number | null; value: number | null; percent: number | null }>[] = [];
+    const present: boolean[] = [];
+    for (let t = 0; t < T; t++) {
+      const m = new Map<string, { shares: number | null; value: number | null; percent: number | null }>();
+      let p: boolean;
+      if (kind === "fund") {
+        p = idx[t].funds.has(id);
+        const mf = idx[t].funds.get(id);
+        if (mf) for (const [isin, h] of mf.holds) m.set(isin, { shares: h.shares, value: h.value, percent: h.percent });
+      } else {
+        p = idx[t].houses.has(amcSlug);
+        for (const mf of idx[t].funds.values()) {
+          if (mf.amcSlug !== amcSlug) continue;
+          for (const [isin, h] of mf.holds) {
+            const cur = m.get(isin) ?? { shares: null, value: null, percent: null };
+            if (h.shares != null) cur.shares = (cur.shares ?? 0) + h.shares;
+            if (h.value != null) cur.value = (cur.value ?? 0) + h.value;
+            m.set(isin, cur);
+          }
+        }
+      }
+      present.push(p);
+      perMonth.push(m);
+    }
+
+    // For a house, % of portfolio = a holding's value share of the house's equity.
+    const houseTotal: number[] = perMonth.map((m) => {
+      let s = 0;
+      for (const v of m.values()) if (v.value != null) s += v.value;
+      return s;
+    });
+
+    const isins = new Set<string>();
+    for (const m of perMonth) for (const k of m.keys()) isins.add(k);
+
+    const holdings: FundHoldingTrend[] = [];
+    for (const isin of isins) {
+      const shares: (number | null)[] = [];
+      const percent: (number | null)[] = [];
+      const valueInr: (number | null)[] = [];
+      const change: (number | null)[] = [];
+      const event: (("new" | "exit") | null)[] = [];
+      for (let t = 0; t < T; t++) {
+        const held = perMonth[t].get(isin);
+        let s: number | null, v: number | null, pc: number | null;
+        if (!present[t]) { s = null; v = null; pc = null; }
+        else if (!held) { s = 0; v = 0; pc = 0; }
+        else {
+          s = held.shares; v = held.value;
+          pc = kind === "fund"
+            ? held.percent
+            : held.value != null && houseTotal[t] > 0 ? round4((held.value / houseTotal[t]) * 100) : null;
+        }
+        shares.push(s); valueInr.push(v); percent.push(pc);
+        const sp = t === 0 ? null : shares[t - 1];
+        if (t === 0 || !present[t] || !present[t - 1] || s == null || sp == null) {
+          change.push(null); event.push(null);
+        } else {
+          change.push(s - sp);
+          event.push(sp === 0 && s > 0 ? "new" : sp > 0 && s === 0 ? "exit" : null);
+        }
+      }
+      holdings.push({
+        isin,
+        name: nameOf.get(isin) ?? isin,
+        sector: sectorOf.get(isin) ?? null,
+        macroSector: macroOf(sectorOf.get(isin) ?? null),
+        marketCap: (caps[isin] ?? null) as MarketCap | null,
+        shares, percent, valueInr, change, event,
+      });
+    }
+    // Biggest current positions first (nulls last).
+    holdings.sort((a, b) => (b.shares[L] ?? -1) - (a.shares[L] ?? -1));
+
+    const alloc = new Map<string, number>();
+    for (const h of holdings) {
+      const v = h.valueInr[L];
+      if (v != null && v > 0) {
+        const key = h.macroSector ?? "Unknown";
+        alloc.set(key, (alloc.get(key) ?? 0) + v);
+      }
+    }
+    const sectorAllocation = [...alloc.entries()]
+      .map(([sector, valueInr]) => ({ sector, valueInr }))
+      .sort((a, b) => b.valueInr - a.valueInr);
+
+    return {
+      schemaVersion: SCHEMA, kind, id, name, house, amcSlug,
+      months: monthKeys, monthLabels: labels, present,
+      comparableLatest: present[L] && L >= 1 && present[L - 1],
+      holdings, sectorAllocation,
+    };
+  };
+
+  // Build a detail for every fund AND every house present in the latest month.
+  const entities: { kind: "fund" | "house"; id: string; amcSlug: string; name: string; house: string }[] = [];
+  for (const [fundId, mf] of idx[L].funds) {
+    entities.push({ kind: "fund", id: fundId, amcSlug: mf.amcSlug, name: mf.fundName, house: mf.fundHouse });
+  }
+  for (const slug of idx[L].houses) {
+    const nm = houseName.get(slug) ?? slug;
+    entities.push({ kind: "house", id: slug, amcSlug: slug, name: nm, house: nm });
+  }
+  for (const e of entities) {
+    const detail = buildEntity(e.kind, e.id, e.amcSlug, e.name, e.house);
+    fundDetails.push(detail);
+    let stockCount = 0;
+    let valueInr: number | null = null;
+    for (const h of detail.holdings) {
+      const s = h.shares[L], v = h.valueInr[L];
+      if ((s != null && s > 0) || (v != null && v > 0)) stockCount++;
+      if (v != null) valueInr = (valueInr ?? 0) + v;
+    }
+    fundIndex.push({
+      kind: e.kind, id: e.id, file: fundFileKey(e.kind, e.id),
+      name: e.name, house: e.house, stockCount, valueInr,
+    });
+  }
+  // Houses first, then funds; each alphabetical — a tidy default for the picker.
+  fundIndex.sort((a, b) =>
+    a.kind !== b.kind ? (a.kind === "house" ? -1 : 1) : a.name.localeCompare(b.name));
+
   // ---- write outputs ----
   mkdirSync(OUT_DIR, { recursive: true });
   rmSync(DETAIL_DIR, { recursive: true, force: true });
   mkdirSync(DETAIL_DIR, { recursive: true });
+  rmSync(FUNDS_DIR, { recursive: true, force: true });
+  mkdirSync(FUNDS_DIR, { recursive: true });
 
   // Macro-sector colour order — the 8 biggest macro sectors by latest value get a
   // colour; stored so every page colours sectors identically. Rest fold to "Other".
@@ -481,9 +630,19 @@ function main(): void {
     writeFileSync(resolve(DETAIL_DIR, `${d.isin}.json`), JSON.stringify(d)); // minified
   }
 
+  const latestMeta = summary.months[summary.months.length - 1];
+  const fundsIndexOut: FundsIndex = {
+    schemaVersion: SCHEMA, month: latestMeta.month, monthLabel: latestMeta.label, entries: fundIndex,
+  };
+  writeFileSync(resolve(OUT_DIR, "funds.json"), JSON.stringify(fundsIndexOut)); // minified — machine-loaded
+  for (const f of fundDetails) {
+    writeFileSync(resolve(FUNDS_DIR, `${fundFileKey(f.kind, f.id)}.json`), JSON.stringify(f)); // minified
+  }
+
   console.log(
     `Wrote summary.json, stocks.json (${stocks.length} stocks), sectors.json ` +
-      `(${sectorsOut.sectors.length} macro sectors), and ${details.length} per-stock detail files.`,
+      `(${sectorsOut.sectors.length} macro sectors), ${details.length} per-stock detail files, ` +
+      `funds.json (${fundIndex.length} funds+houses), and ${fundDetails.length} per-fund detail files.`,
   );
   console.log(
     `Market cap: ${capMatched}/${stocks.length} stocks tagged (${((100 * capMatched) / stocks.length).toFixed(1)}%)` +

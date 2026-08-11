@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-11T06:54:35.956Z",
+  "generatedAt": "2026-08-11T07:35:21.780Z",
   "topSectors": [
     "Financial Services",
     "Consumer Discretionary",
@@ -159,10 +159,10 @@
     {
       "month": "2026-07",
       "label": "July 2026",
-      "housesPresent": 30,
+      "housesPresent": 33,
       "housesTotal": 50,
-      "fundCount": 1042,
-      "stockCount": 1240
+      "fundCount": 1131,
+      "stockCount": 1269
     }
   ]
 }

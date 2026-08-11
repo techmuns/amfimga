@@ -129,7 +129,11 @@ the browser loads. Pure recomputation, no network. Served files (`public/data`):
   shares, total value (rupees), fund count, and net share change.
 - `sectors.json` — net share-change summed by sector, per month.
 - `stocks/<ISIN>.json` — per-stock fund-by-fund detail, loaded on demand.
-  (Git-ignored — bulky and reproducible; regenerated on deploy.)
+- `funds.json` — the fund/house picker index: every scheme + AMC present in the
+  latest month, with its stock count and equity value.
+- `funds/<key>.json` — per-fund AND per-house holdings over time (the flip side of
+  the stock page), loaded on demand. `stocks/` and `funds/` are git-ignored —
+  bulky and reproducible; regenerated on deploy.
 
 **Coverage-awareness (the core Step-3 rule).** A month-over-month change is only
 computed from funds whose fund HOUSE is present in BOTH months. If a house is a
@@ -168,10 +172,11 @@ data/months/               Raw month files (NOT served; input to derive)
   <YYYY-MM>.json.gz        One month, all fund houses (gzipped; produced by ingestion)
 src/
   main.tsx                 React entry
-  App.tsx                  Home page: top net buys/sells + coverage
+  App.tsx                  Home page + client routing: top net buys/sells + coverage
   index.css                Tailwind entry + base styles
+  components/FundView.tsx  Per-fund / per-house view (picker, activity, holdings, allocation)
   types/holdings.ts        Data types (raw + derived; the format contract)
-  lib/data.ts              Runtime loaders: loadSummary/loadStocks/loadSectors/loadStockDetail
+  lib/data.ts              Runtime loaders: loadSummary/loadStocks/loadSectors/loadStockDetail/loadFunds*
   lib/format.ts            Display helpers: DASH, formatInr, formatPercent, formatCount, formatSignedCount
 public/
   favicon.svg
@@ -179,7 +184,9 @@ public/
     summary.json           Months + coverage counts
     stocks.json            Compact all-stocks table
     sectors.json           Net share-change by sector
+    funds.json             Fund/house picker index
     stocks/<ISIN>.json     Per-stock detail (git-ignored; regenerated on deploy)
+    funds/<key>.json       Per-fund & per-house detail (git-ignored; regenerated on deploy)
 docs/data-format.md        On-disk data format, in prose
 wrangler.jsonc             Worker + assets config
 ```
@@ -211,12 +218,12 @@ AdvisorKhoj scraper (`scripts/ingest.ts` / `ingest.yml`):
 
 ## Scope discipline
 
-Build this project one step at a time. Steps 1–5 (setup, ingestion, derived
-signals, main dashboard, stock detail page) are done. Everything is EQUITY only
-(derive keeps ISINs whose security-type is "01"). The UI follows a fixed design
-system (tokens in `src/index.css`: one font, standardized sizes, the palette,
-sector colours, chart-mark rules) — use it exactly; never invent colours or
-fonts. Client routing is path-based (`/` dashboard, `/stock/<ISIN>` detail,
-`/ideas` idea lists). Steps 1–6 are done (setup → ingestion → derived signals →
-dashboard → detail → ideas). When in doubt, keep the five rules, the data shape,
-and the design system intact.
+Build this project one step at a time. Everything is EQUITY only (derive keeps
+ISINs whose security-type is "01"). The UI follows a fixed design system (tokens
+in `src/index.css`: one font, standardized sizes, the palette, sector colours,
+chart-mark rules) — use it exactly; never invent colours or fonts. Client routing
+is path-based (`/` dashboard, `/stock/<ISIN>` detail, `/ideas` idea lists,
+`/funds` picker, `/fund/<key>` per-fund/house view). All nine steps are done
+(setup → ingestion → derived signals → dashboard → detail → ideas → macro/cap →
+full ~50-house data via AMFIBEAS → per-fund view). When in doubt, keep the five
+rules, the data shape, and the design system intact.

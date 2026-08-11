@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FundTrend, StockDetail, SummaryMeta } from "../types/holdings";
-import { loadStockDetail, loadSummary } from "../lib/data";
+import { fundFileKey, loadStockDetail, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale } from "../lib/palette";
 import { DASH, formatCount, formatPercent, formatSignedCount } from "../lib/format";
@@ -178,8 +178,30 @@ function FundRow({ f, last, labels, tt }: { f: FundTrend; last: number; labels: 
   return (
     <div className="fund-grid stock-row" style={{ padding: "8px 14px" }}>
       <div style={{ minWidth: 0 }}>
-        <div className="t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fundName}</div>
-        <div className="t-muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fundHouse}</div>
+        {f.present[last] ? (
+          <button
+            className="link t-body"
+            style={{ display: "block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}
+            title={f.fundName}
+            onClick={() => navigate(`/fund/${fundFileKey("fund", f.fundId)}`)}
+          >
+            {f.fundName}
+          </button>
+        ) : (
+          <div className="t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fundName}</div>
+        )}
+        {f.present[last] ? (
+          <button
+            className="link t-muted"
+            style={{ display: "block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}
+            title={f.fundHouse}
+            onClick={() => navigate(`/fund/${fundFileKey("house", f.fundId.split(":")[0])}`)}
+          >
+            {f.fundHouse}
+          </button>
+        ) : (
+          <div className="t-muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fundHouse}</div>
+        )}
       </div>
       <div className="cell-r t-body num">{formatCount(f.shares[last])}</div>
       <div

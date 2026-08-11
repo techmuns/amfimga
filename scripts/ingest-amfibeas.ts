@@ -59,6 +59,15 @@ const MIN_MONTH = "2025-01";
 const nowUTC = new Date();
 const MAX_MONTH = `${nowUTC.getUTCFullYear()}-${String(nowUTC.getUTCMonth() + 1).padStart(2, "0")}`;
 
+// A few houses have an upstream parser bug where the scheme "as on" date is read
+// from the wrong cell (e.g. a bond's maturity date), so EVERY snapshot date is
+// junk and the sanity-clamp would drop the whole house. They are large, real
+// houses that disclose monthly, and AMFIBEAS fetched them in the current cycle —
+// so we recover their single latest snapshot to the newest disclosure month
+// rather than lose it. Guarded: this list only, primary snapshot only, and only
+// when the date is otherwise unusable (AMFIBEAS slugs).
+const RECOVER_TO_LATEST = new Set(["uti", "zerodha", "jm-financial"]);
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -348,9 +357,20 @@ async function main(): Promise<void> {
   const houses = await loadAmfibeasHouses(localDir);
   console.log(`AMFIBEAS houses loaded: ${houses.length}`);
 
+  // The newest disclosure month present anywhere — the target for recovering the
+  // few houses whose dates are all junk (see RECOVER_TO_LATEST).
+  let latestMonth = MIN_MONTH;
+  for (const house of houses) {
+    for (const snap of [{ schemes: house.schemes }, ...(house.history ?? [])]) {
+      const m = snapshotMonth(snap);
+      if (m && m > latestMonth) latestMonth = m;
+    }
+  }
+
   // Accumulate fresh funds per month (deduped by fundId).
   const perMonth = new Map<string, Map<string, FundHoldings>>();
   const unmatched = new Set<string>();
+  const recovered = new Set<string>();
   let droppedSnaps = 0;
 
   for (const house of houses) {
@@ -362,8 +382,12 @@ async function main(): Promise<void> {
       unmatched.add(amcName);
     }
     const snaps: AbSnapshot[] = [{ asOfMonth: house.asOfMonth, asOf: house.asOf, schemes: house.schemes }, ...(house.history ?? [])];
-    for (const snap of snaps) {
-      const month = snapshotMonth(snap);
+    for (const [i, snap] of snaps.entries()) {
+      let month = snapshotMonth(snap);
+      if (!month && i === 0 && RECOVER_TO_LATEST.has(String(house.amcSlug ?? ""))) {
+        month = latestMonth; // guarded recovery of a misdated large house
+        recovered.add(canon.name);
+      }
       if (!month) { droppedSnaps++; continue; }
       const funds = snapshotFunds(snap, canon);
       if (funds.length === 0) continue;
@@ -377,6 +401,7 @@ async function main(): Promise<void> {
     }
   }
 
+  if (recovered.size) console.log(`  · recovered ${recovered.size} misdated house(s) → ${latestMonth}: ${[...recovered].join(", ")}`);
   if (unmatched.size) {
     console.log(`  ! ${unmatched.size} AMFIBEAS house(s) had no canonical match (used a derived slug): ${[...unmatched].join(", ")}`);
   }

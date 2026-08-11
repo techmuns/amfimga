@@ -103,6 +103,14 @@
     column-gap: 12px;
   }
 
+  /* Holdings table on the per-fund page: Stock · Sector · Shares · % · Change · Trend. */
+  .hold-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 2fr) 140px 118px 96px 128px 64px;
+    align-items: center;
+    column-gap: 12px;
+  }
+
   .badge {
     font-size: 12px;
     font-weight: 600;

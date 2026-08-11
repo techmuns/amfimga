@@ -234,3 +234,76 @@ export interface SectorRow {
   /** Per-month net share change across the sector. `null` = no prior month / all unknown. */
   netShareChange: (number | null)[];
 }
+
+// ===========================================================================
+// Per-fund view (Step 9)
+//
+// The flip side of the stock page: pick a fund (scheme) or a whole fund house
+// and see what IT is doing. Same coverage rules — if the fund/house wasn't in
+// the prior month's data, this month's change is `null` (shown as "—"), never a
+// fake move.
+// ===========================================================================
+
+/** `public/data/funds.json` — the searchable fund/house picker index. */
+export interface FundsIndex {
+  schemaVersion: number;
+  /** Latest month key + label the counts below are for. */
+  month: string;
+  monthLabel: string;
+  entries: FundIndexEntry[];
+}
+
+export interface FundIndexEntry {
+  kind: "fund" | "house";
+  /** fundId (for a fund) or amcSlug (for a house). */
+  id: string;
+  /** URL-/file-safe key; the detail lives at `/data/funds/<file>.json`. */
+  file: string;
+  /** Fund/scheme name, or fund-house name. */
+  name: string;
+  /** The AMC. For a house entry this equals `name`. */
+  house: string;
+  /** Distinct equity stocks held in the latest month. */
+  stockCount: number;
+  /** Total equity market value held in the latest month, plain rupees. `null` if unknown. */
+  valueInr: number | null;
+}
+
+/** `public/data/funds/<file>.json` — one fund's (or house's) holdings over time. */
+export interface FundDetail {
+  schemaVersion: number;
+  kind: "fund" | "house";
+  id: string;
+  name: string;
+  house: string;
+  amcSlug: string;
+  months: string[];
+  monthLabels: string[];
+  /** Per-month: was this fund/house present in the data (drives coverage "—"). */
+  present: boolean[];
+  /** True if the LATEST month can be compared to the prior one (present in both). */
+  comparableLatest: boolean;
+  holdings: FundHoldingTrend[];
+  /** Latest-month allocation by macro sector (plain rupees), biggest first. */
+  sectorAllocation: { sector: string; valueInr: number }[];
+}
+
+export interface FundHoldingTrend {
+  isin: string;
+  name: string;
+  /** Granular industry. */
+  sector: string | null;
+  /** Broad macro sector (for the colour dot + allocation bar). */
+  macroSector: string | null;
+  marketCap: MarketCap | null;
+  /** Per-month shares this fund/house held. `null` = not in data that month (unknown). */
+  shares: (number | null)[];
+  /** Per-month share of the portfolio (0–100). `null` when unknown. */
+  percent: (number | null)[];
+  /** Per-month market value held, plain rupees. `null` when unknown. */
+  valueInr: (number | null)[];
+  /** Per-month share change vs previous month. `null` = coverage gap / not comparable. */
+  change: (number | null)[];
+  /** Per-month event: a `new` position or an `exit`, else `null`. */
+  event: (("new" | "exit") | null)[];
+}

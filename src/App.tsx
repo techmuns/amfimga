@@ -10,6 +10,7 @@ import { DivergingBars, type DivRow } from "./components/charts";
 import { StockTable } from "./components/StockTable";
 import { StockDetailPage } from "./components/StockDetail";
 import { IdeasPage } from "./components/Ideas";
+import { FundDetailPage, FundsPage } from "./components/FundView";
 
 type Data = { summary: SummaryMeta; stocks: StocksSummary; sectors: SectorSummary };
 type LoadState =
@@ -20,8 +21,13 @@ type LoadState =
 export function App() {
   const path = useRoute();
   const stockMatch = path.match(/^\/stock\/([^/]+)$/);
+  const fundMatch = path.match(/^\/fund\/([^/]+)$/);
   const content = stockMatch ? (
     <StockDetailPage isin={decodeURIComponent(stockMatch[1])} />
+  ) : fundMatch ? (
+    <FundDetailPage file={decodeURIComponent(fundMatch[1])} />
+  ) : path === "/funds" ? (
+    <FundsPage />
   ) : path === "/ideas" ? (
     <IdeasPage />
   ) : (
@@ -77,6 +83,7 @@ function Dashboard({ data }: { data: Data }) {
           </div>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <button className="link t-label" onClick={() => navigate("/funds")}>Funds →</button>
           <button className="link t-label" onClick={() => navigate("/ideas")}>Ideas →</button>
           <span className="t-section" style={{ color: "var(--ink-2)" }}>{month.label}</span>
           <ThemeToggle />

@@ -4,9 +4,11 @@ node_modules/
 # Build output
 dist/
 
-# Derived per-stock detail files — large and reproducible from data/months via
-# `npm run derive`. The small summaries (summary/stocks/sectors.json) ARE tracked.
+# Derived per-stock / per-fund detail files — large and reproducible from
+# data/months via `npm run derive`. The small summaries (summary/stocks/sectors/
+# funds.json) ARE tracked.
 public/data/stocks/
+public/data/funds/
 
 # Cloudflare / Wrangler
 .wrangler/

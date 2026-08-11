@@ -3,6 +3,8 @@ import type {
   StocksSummary,
   StockDetail,
   SectorSummary,
+  FundsIndex,
+  FundDetail,
 } from "../types/holdings";
 
 /**
@@ -34,3 +36,15 @@ export const loadSectors = (): Promise<SectorSummary> =>
 /** One stock's fund-by-fund detail, loaded on demand. */
 export const loadStockDetail = (isin: string): Promise<StockDetail> =>
   getJson(`/data/stocks/${encodeURIComponent(isin)}.json`, `details for ${isin}`);
+
+/** The searchable fund/house picker index for the per-fund view. */
+export const loadFundsIndex = (): Promise<FundsIndex> =>
+  getJson("/data/funds.json", "the funds list");
+
+/** One fund's (or house's) holdings-over-time detail, loaded on demand. */
+export const loadFundDetail = (file: string): Promise<FundDetail> =>
+  getJson(`/data/funds/${encodeURIComponent(file)}.json`, `details for ${file}`);
+
+/** URL-/file-safe key for a fund or house detail. MUST match `fundFileKey` in scripts/derive.ts. */
+export const fundFileKey = (kind: "fund" | "house", id: string): string =>
+  `${kind}__${id}`.replace(/[^A-Za-z0-9._-]/g, "_");
