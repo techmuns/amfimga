@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-10T19:30:31.842Z",
+  "generatedAt": "2026-08-11T03:44:39.338Z",
   "months": [
     {
       "month": "2026-03",
@@ -8,7 +8,7 @@
       "housesPresent": 18,
       "housesTotal": 50,
       "fundCount": 421,
-      "stockCount": 2743
+      "stockCount": 1169
     },
     {
       "month": "2026-04",
@@ -16,7 +16,7 @@
       "housesPresent": 18,
       "housesTotal": 50,
       "fundCount": 497,
-      "stockCount": 3086
+      "stockCount": 1178
     },
     {
       "month": "2026-05",
@@ -24,7 +24,7 @@
       "housesPresent": 18,
       "housesTotal": 50,
       "fundCount": 504,
-      "stockCount": 2771
+      "stockCount": 927
     }
   ]
 }

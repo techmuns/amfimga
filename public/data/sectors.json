@@ -12,62 +12,6 @@
   ],
   "sectors": [
     {
-      "sector": "[ICRA]A-",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "[ICRA]A1+",
-      "netShareChange": [
-        null,
-        18564800,
-        19936100
-      ]
-    },
-    {
-      "sector": "[ICRA]AA",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "[ICRA]AA-",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "[ICRA]AA+",
-      "netShareChange": [
-        null,
-        12850,
-        1009945
-      ]
-    },
-    {
-      "sector": "[ICRA]AAA",
-      "netShareChange": [
-        null,
-        1571000,
-        2963500
-      ]
-    },
-    {
-      "sector": "ACUITE A-",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
       "sector": "Aerospace & Defense",
       "netShareChange": [
         null,
@@ -108,14 +52,6 @@
       ]
     },
     {
-      "sector": "AUTOMOBILES",
-      "netShareChange": [
-        null,
-        5413108,
-        18174899
-      ]
-    },
-    {
       "sector": "Banks",
       "netShareChange": [
         null,
@@ -137,102 +73,6 @@
         null,
         4778497,
         48021273
-      ]
-    },
-    {
-      "sector": "CARE A",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "CARE A-",
-      "netShareChange": [
-        null,
-        0,
-        -1425
-      ]
-    },
-    {
-      "sector": "CARE A(CE)",
-      "netShareChange": [
-        null,
-        0,
-        -401100
-      ]
-    },
-    {
-      "sector": "CARE A+",
-      "netShareChange": [
-        null,
-        0,
-        15000
-      ]
-    },
-    {
-      "sector": "CARE A1+",
-      "netShareChange": [
-        null,
-        -2485000,
-        -10038000
-      ]
-    },
-    {
-      "sector": "CARE AA",
-      "netShareChange": [
-        null,
-        0,
-        -7500
-      ]
-    },
-    {
-      "sector": "CARE AA-",
-      "netShareChange": [
-        null,
-        -2500,
-        -107500
-      ]
-    },
-    {
-      "sector": "CARE AA(SO)",
-      "netShareChange": [
-        null,
-        null,
-        100
-      ]
-    },
-    {
-      "sector": "CARE AA+",
-      "netShareChange": [
-        null,
-        0,
-        -2500
-      ]
-    },
-    {
-      "sector": "CARE AAA",
-      "netShareChange": [
-        null,
-        -9910,
-        1999850
-      ]
-    },
-    {
-      "sector": "CARE AAA(CE)",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "CARE BBB+",
-      "netShareChange": [
-        null,
-        0,
-        1500
       ]
     },
     {
@@ -279,8 +119,8 @@
       "sector": "Construction",
       "netShareChange": [
         null,
-        -11788403,
-        2684321
+        -8963930,
+        4821484
       ]
     },
     {
@@ -297,86 +137,6 @@
         null,
         -8587863,
         2723586
-      ]
-    },
-    {
-      "sector": "CRISIL A",
-      "netShareChange": [
-        null,
-        -500,
-        0
-      ]
-    },
-    {
-      "sector": "CRISIL A+",
-      "netShareChange": [
-        null,
-        22700,
-        0
-      ]
-    },
-    {
-      "sector": "CRISIL A+(CE)",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "CRISIL A1+",
-      "netShareChange": [
-        null,
-        12675040,
-        11572960
-      ]
-    },
-    {
-      "sector": "CRISIL AA",
-      "netShareChange": [
-        null,
-        1023500,
-        -478500
-      ]
-    },
-    {
-      "sector": "CRISIL AA-",
-      "netShareChange": [
-        null,
-        -5000,
-        9000
-      ]
-    },
-    {
-      "sector": "CRISIL AA+",
-      "netShareChange": [
-        null,
-        8170050,
-        21490
-      ]
-    },
-    {
-      "sector": "CRISIL AAA",
-      "netShareChange": [
-        null,
-        9410260,
-        -156231410
-      ]
-    },
-    {
-      "sector": "CRISIL AAA(CE)",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "CRISIL AAA(SO)",
-      "netShareChange": [
-        null,
-        150,
-        25
       ]
     },
     {
@@ -460,62 +220,6 @@
       ]
     },
     {
-      "sector": "FITCH A",
-      "netShareChange": [
-        null,
-        null,
-        0
-      ]
-    },
-    {
-      "sector": "FITCH A1+",
-      "netShareChange": [
-        null,
-        -9529500,
-        -15400
-      ]
-    },
-    {
-      "sector": "FITCH AA",
-      "netShareChange": [
-        null,
-        -503000,
-        0
-      ]
-    },
-    {
-      "sector": "FITCH AA-",
-      "netShareChange": [
-        null,
-        null,
-        10500
-      ]
-    },
-    {
-      "sector": "FITCH AA(CE)",
-      "netShareChange": [
-        null,
-        0,
-        -8598
-      ]
-    },
-    {
-      "sector": "FITCH AAA",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "FITCH AAA(SO)",
-      "netShareChange": [
-        null,
-        null,
-        0
-      ]
-    },
-    {
       "sector": "Food Products",
       "netShareChange": [
         null,
@@ -561,174 +265,6 @@
         null,
         1259954,
         23912
-      ]
-    },
-    {
-      "sector": "ICRA A",
-      "netShareChange": [
-        null,
-        null,
-        20000
-      ]
-    },
-    {
-      "sector": "ICRA A+",
-      "netShareChange": [
-        null,
-        0,
-        -1500
-      ]
-    },
-    {
-      "sector": "ICRA A+(CE)",
-      "netShareChange": [
-        null,
-        0,
-        350
-      ]
-    },
-    {
-      "sector": "ICRA A1+",
-      "netShareChange": [
-        null,
-        -2416800,
-        -22000
-      ]
-    },
-    {
-      "sector": "ICRA AA",
-      "netShareChange": [
-        null,
-        -15000,
-        3900245
-      ]
-    },
-    {
-      "sector": "ICRA AA-",
-      "netShareChange": [
-        null,
-        0,
-        5000
-      ]
-    },
-    {
-      "sector": "ICRA AA+",
-      "netShareChange": [
-        null,
-        1985500,
-        1605325
-      ]
-    },
-    {
-      "sector": "ICRA AAA",
-      "netShareChange": [
-        null,
-        -6275,
-        9300
-      ]
-    },
-    {
-      "sector": "ICRA AAA(SO)",
-      "netShareChange": [
-        null,
-        0,
-        -9490
-      ]
-    },
-    {
-      "sector": "ICRA BBB+",
-      "netShareChange": [
-        null,
-        0,
-        10000
-      ]
-    },
-    {
-      "sector": "ICRA D",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "IND A",
-      "netShareChange": [
-        null,
-        -3000,
-        null
-      ]
-    },
-    {
-      "sector": "IND A-",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "IND A1+",
-      "netShareChange": [
-        null,
-        5998040,
-        -11020000
-      ]
-    },
-    {
-      "sector": "IND AA",
-      "netShareChange": [
-        null,
-        -5375,
-        -5800
-      ]
-    },
-    {
-      "sector": "IND AA(CE)",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "IND AA+",
-      "netShareChange": [
-        null,
-        0,
-        -7
-      ]
-    },
-    {
-      "sector": "IND AAA",
-      "netShareChange": [
-        null,
-        -7750,
-        -2500
-      ]
-    },
-    {
-      "sector": "IND AAA(CE)",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "IND AAA(SO)",
-      "netShareChange": [
-        null,
-        0,
-        0
-      ]
-    },
-    {
-      "sector": "IND BBB+",
-      "netShareChange": [
-        null,
-        5700,
-        0
       ]
     },
     {
@@ -812,14 +348,6 @@
       ]
     },
     {
-      "sector": "N.A.",
-      "netShareChange": [
-        null,
-        -70550000,
-        34979500
-      ]
-    },
-    {
       "sector": "Non - Ferrous Metals",
       "netShareChange": [
         null,
@@ -857,14 +385,6 @@
         null,
         245539,
         -9067
-      ]
-    },
-    {
-      "sector": "Overseas Mutual Fund",
-      "netShareChange": [
-        null,
-        11234188,
-        109085487
       ]
     },
     {
@@ -912,15 +432,15 @@
       "netShareChange": [
         null,
         65301666,
-        42543888
+        43071818
       ]
     },
     {
       "sector": "Realty",
       "netShareChange": [
         null,
-        20307595,
-        20871294
+        -3739509,
+        6648028
       ]
     },
     {
@@ -959,8 +479,8 @@
       "sector": "Transport Infrastructure",
       "netShareChange": [
         null,
-        -10500602,
-        -8708304
+        -12665950,
+        -8796571
       ]
     },
     {

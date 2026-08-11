@@ -90,6 +90,24 @@ function loadMonths(): { month: string; data: MonthData }[] {
     }));
 }
 
+// Ordinary equity shares only (a decision from the start). In an Indian ISIN the
+// two characters after the 4-char company code (positions 8-9) encode the security
+// type: "01" = ordinary equity; bonds/debentures use 07/08/09/0A… Verified against
+// real ISINs (HDFC INE040A01034 → "01"; every 07/08 in our data is a bond).
+const RATING_AGENCY = /\b(crisil|icra|care|fitch|brickwork|bwr|india ratings)\b/i;
+const RATING_GRADE = /\b(aaa|aa|a1|a2|a3|a4|bbb|bb)\b/i;
+const GOV_DEBT = /\b(sovereign|treasury bills?|t-bills?|g-sec|gilts?|state development loans?|government securit\w*)\b/i;
+
+function isEquity(isin: string, sector: string | null): boolean {
+  if (isin.length !== 12 || isin.slice(7, 9) !== "01") return false;
+  // Backstop: drop anything mislabelled with a credit rating or a govt-security
+  // "sector" (defensive — no equity ISIN in the data currently trips this).
+  if (sector && ((RATING_AGENCY.test(sector) && RATING_GRADE.test(sector)) || GOV_DEBT.test(sector))) {
+    return false;
+  }
+  return true;
+}
+
 function indexMonth(data: MonthData): MonthIndex {
   const funds = new Map<string, MonthFund>();
   const houses = new Set<string>();
@@ -104,6 +122,7 @@ function indexMonth(data: MonthData): MonthIndex {
       funds.set(f.fundId, mf);
     }
     for (const h of f.holdings) {
+      if (!isEquity(h.isin, h.sector)) continue; // equity shares only — drop bonds/debt
       const prev = mf.holds.get(h.isin);
       if (prev) {
         // Same ISIN listed on more than one line in a scheme → combine.
