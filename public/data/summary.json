@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-12T04:03:26.870Z",
+  "generatedAt": "2026-08-12T09:54:58.667Z",
   "topSectors": [
     "Financial Services",
     "Consumer Discretionary",
@@ -74,7 +74,7 @@
       "housesPresent": 14,
       "housesTotal": 50,
       "fundCount": 411,
-      "stockCount": 1138
+      "stockCount": 1141
     },
     {
       "month": "2025-09",
@@ -103,66 +103,66 @@
     {
       "month": "2025-12",
       "label": "December 2025",
-      "housesPresent": 18,
+      "housesPresent": 22,
       "housesTotal": 50,
-      "fundCount": 537,
-      "stockCount": 1178
+      "fundCount": 604,
+      "stockCount": 1190
     },
     {
       "month": "2026-01",
       "label": "January 2026",
-      "housesPresent": 20,
+      "housesPresent": 37,
       "housesTotal": 50,
-      "fundCount": 577,
-      "stockCount": 1186
+      "fundCount": 1159,
+      "stockCount": 1267
     },
     {
       "month": "2026-02",
       "label": "February 2026",
-      "housesPresent": 20,
+      "housesPresent": 37,
       "housesTotal": 50,
-      "fundCount": 582,
-      "stockCount": 1188
+      "fundCount": 1188,
+      "stockCount": 1273
     },
     {
       "month": "2026-03",
       "label": "March 2026",
-      "housesPresent": 21,
+      "housesPresent": 39,
       "housesTotal": 50,
-      "fundCount": 540,
-      "stockCount": 1180
+      "fundCount": 1257,
+      "stockCount": 1273
     },
     {
       "month": "2026-04",
       "label": "April 2026",
-      "housesPresent": 21,
+      "housesPresent": 41,
       "housesTotal": 50,
-      "fundCount": 550,
-      "stockCount": 1187
+      "fundCount": 1292,
+      "stockCount": 1274
     },
     {
       "month": "2026-05",
       "label": "May 2026",
-      "housesPresent": 23,
+      "housesPresent": 44,
       "housesTotal": 50,
-      "fundCount": 578,
-      "stockCount": 1029
+      "fundCount": 1379,
+      "stockCount": 1283
     },
     {
       "month": "2026-06",
       "label": "June 2026",
-      "housesPresent": 22,
+      "housesPresent": 46,
       "housesTotal": 50,
-      "fundCount": 523,
-      "stockCount": 1010
+      "fundCount": 1428,
+      "stockCount": 1267
     },
     {
       "month": "2026-07",
       "label": "July 2026",
-      "housesPresent": 37,
+      "housesPresent": 43,
       "housesTotal": 50,
-      "fundCount": 1241,
-      "stockCount": 1273
+      "fundCount": 1410,
+      "stockCount": 1289
     }
   ]
 }
