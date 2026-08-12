@@ -251,6 +251,22 @@ export interface FundsIndex {
   month: string;
   monthLabel: string;
   entries: FundIndexEntry[];
+  /** Funds that tend to buy a stock before the crowd piles in (coverage-guarded lead–lag). */
+  trendsetters?: TrendsetterEntry[];
+}
+
+/** A fund that repeatedly entered a stock early, before many other funds followed. */
+export interface TrendsetterEntry {
+  /** Fund detail file key (for linking). */
+  file: string;
+  name: string;
+  house: string;
+  /** Early entries where the crowd then followed (≥5 more funds, among houses present at entry). */
+  score: number;
+  /** Early entries assessed (the denominator). */
+  evaluated: number;
+  /** Up to 3 example stocks it was early on. */
+  examples: string[];
 }
 
 export interface FundIndexEntry {

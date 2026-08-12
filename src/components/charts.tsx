@@ -102,15 +102,38 @@ export function DivergingBars({ rows, maxAbs }: { rows: DivRow[]; maxAbs: number
   );
 }
 
-/** Simple line chart of a value across months, with hover crosshair + tooltip. */
+export interface LineOverlay {
+  label: string;
+  values: (number | null)[];
+  color: string;
+}
+
+/**
+ * Line chart of a value across months, with hover crosshair + tooltip. Defaults
+ * to a share-count series (back-compatible), but `format`/`seriesLabel` let it
+ * show value (₹) or implied price instead, and `overlays` draws extra lines
+ * (e.g. one fund vs the total) on the same scale with a small legend.
+ */
 export function LineChart({
   values,
   labels,
   netChanges,
+  format = formatCount,
+  formatShort = formatCountShort,
+  formatChange = formatSignedCount,
+  seriesLabel = "Total shares",
+  changeLabel = "Net change",
+  overlays = [],
 }: {
   values: (number | null)[];
   labels: string[];
   netChanges: (number | null)[];
+  format?: (n: number | null | undefined) => string;
+  formatShort?: (n: number | null | undefined) => string;
+  formatChange?: (n: number | null | undefined) => string;
+  seriesLabel?: string;
+  changeLabel?: string;
+  overlays?: LineOverlay[];
 }) {
   const tt = useTooltip();
   const [ref, W] = useWidth();
@@ -126,8 +149,10 @@ export function LineChart({
     .map((v, i) => ({ v, i }))
     .filter((p): p is { v: number; i: number } => p.v != null);
 
-  const lo = pts.length ? Math.min(...pts.map((p) => p.v)) : 0;
-  const peak = pts.length ? Math.max(...pts.map((p) => p.v)) : 1;
+  // Include overlay points in the y-range so every line fits.
+  const allVals = [...pts.map((p) => p.v), ...overlays.flatMap((o) => o.values.filter((v): v is number => v != null))];
+  const lo = allVals.length ? Math.min(...allVals) : 0;
+  const peak = allVals.length ? Math.max(...allVals) : 1;
   const pad = (peak - lo) * 0.12 || 1;
   const yMin = lo - pad;
   const yMax = peak + pad;
@@ -135,30 +160,51 @@ export function LineChart({
   const x = (i: number) => padL + (n <= 1 ? (W - padL - padR) / 2 : (i / (n - 1)) * (W - padL - padR));
   const y = (v: number) => padT + (yMax === yMin ? plotH / 2 : (1 - (v - yMin) / (yMax - yMin)) * plotH);
   const d = pts.map((p, k) => `${k ? "L" : "M"}${x(p.i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const pathOf = (vals: (number | null)[]) => {
+    const ps = vals.map((v, i) => ({ v, i })).filter((p): p is { v: number; i: number } => p.v != null);
+    return ps.map((p, k) => `${k ? "L" : "M"}${x(p.i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  };
   const grid = [yMax, (yMax + yMin) / 2, yMin];
 
   const tipFor = (i: number) => (
     <div>
       <div className="t-label">{labels[i]}</div>
-      <div style={{ marginTop: 4 }}><span className="k">Total shares: </span>{formatCount(values[i])}</div>
-      <div>
-        <span className="k">Net change: </span>
-        {netChanges[i] == null ? DASH : (
-          <span style={{ color: netChanges[i]! >= 0 ? "var(--buy)" : "var(--sell)" }}>
-            {netChanges[i]! >= 0 ? "▲" : "▼"} {formatSignedCount(netChanges[i])}
-          </span>
-        )}
-      </div>
+      <div style={{ marginTop: 4 }}><span className="k">{seriesLabel}: </span>{format(values[i])}</div>
+      {overlays.map((o) => (
+        <div key={o.label}><span className="k" style={{ color: o.color }}>{o.label}: </span>{format(o.values[i])}</div>
+      ))}
+      {overlays.length === 0 && (
+        <div>
+          <span className="k">{changeLabel}: </span>
+          {netChanges[i] == null ? DASH : (
+            <span style={{ color: netChanges[i]! >= 0 ? "var(--buy)" : "var(--sell)" }}>
+              {netChanges[i]! >= 0 ? "▲" : "▼"} {formatChange(netChanges[i])}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 
   return (
     <div ref={ref}>
+      {overlays.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginBottom: 6 }}>
+          <Legend color="var(--ink)" label={seriesLabel} />
+          {overlays.map((o) => <Legend key={o.label} color={o.color} label={o.label} />)}
+        </div>
+      )}
       <svg width={W} height={H} style={{ display: "block" }}>
         {grid.map((gv, k) => (
           <g key={k}>
             <line x1={padL} x2={W - padR} y1={y(gv)} y2={y(gv)} stroke="var(--grid)" strokeWidth="1" />
-            <text x={padL} y={y(gv) - 3} fill="var(--muted)" fontSize="12">{formatCountShort(gv)}</text>
+            <text x={padL} y={y(gv) - 3} fill="var(--muted)" fontSize="12">{formatShort(gv)}</text>
+          </g>
+        ))}
+        {overlays.map((o) => (
+          <g key={o.label}>
+            <path d={pathOf(o.values)} fill="none" stroke={o.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
+            {o.values.map((v, i) => v == null ? null : <circle key={i} cx={x(i)} cy={y(v)} r="2.2" fill={o.color} />)}
           </g>
         ))}
         <path d={d} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -200,6 +246,60 @@ export function LineChart({
           />
         ))}
       </svg>
+    </div>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+      <span style={{ width: 12, height: 3, borderRadius: 2, background: color, display: "inline-block" }} />
+      <span className="t-muted">{label}</span>
+    </span>
+  );
+}
+
+/**
+ * Entry/exit timeline: per month, how many funds newly ENTERED (green, up) vs
+ * fully EXITED (red, down) this stock. A quick read of who's arriving or leaving.
+ */
+export function EntryExitBars({ entered, exited, labels }: { entered: number[]; exited: number[]; labels: string[] }) {
+  const tt = useTooltip();
+  const max = Math.max(1, ...entered, ...exited);
+  return (
+    <div>
+      <div style={{ display: "flex", height: 96, position: "relative" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: "1px solid var(--axis)" }} />
+        {labels.map((_, i) => (
+          <div
+            key={i}
+            style={{ flex: 1, position: "relative" }}
+            onMouseEnter={(e) => tt.show(
+              <div>
+                <div className="t-label">{labels[i]}</div>
+                <div style={{ marginTop: 4, color: "var(--buy)" }}>▲ {entered[i]} entered</div>
+                <div style={{ color: "var(--sell)" }}>▼ {exited[i]} exited</div>
+              </div>, e.clientX, e.clientY,
+            )}
+            onMouseMove={(e) => tt.move(e.clientX, e.clientY)}
+            onMouseLeave={tt.hide}
+          >
+            {entered[i] > 0 && (
+              <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 22, bottom: "50%", height: `${(entered[i] / max) * 48}%`, background: "var(--buy)", borderRadius: "3px 3px 0 0" }} />
+            )}
+            {exited[i] > 0 && (
+              <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 22, top: "50%", height: `${(exited[i] / max) * 48}%`, background: "var(--sell)", borderRadius: "0 0 3px 3px" }} />
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", marginTop: 4 }}>
+        {labels.map((l, i) => {
+          const step = Math.max(1, Math.ceil(labels.length / 7));
+          const show = i === 0 || i === labels.length - 1 || i % step === 0;
+          return <div key={i} className="t-muted" style={{ flex: 1, textAlign: "center" }}>{show ? l : ""}</div>;
+        })}
+      </div>
     </div>
   );
 }

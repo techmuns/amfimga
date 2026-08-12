@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FundDetail, FundHoldingTrend, FundsIndex, SummaryMeta } from "../types/holdings";
+import type { FundDetail, FundHoldingTrend, FundsIndex, SummaryMeta, TrendsetterEntry } from "../types/holdings";
 import { loadFundDetail, loadFundsIndex, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
@@ -107,10 +107,39 @@ export function FundsPage({ embedded }: { embedded?: boolean }) {
           <div className="t-muted" style={{ marginTop: 3, marginBottom: 16 }}>
             Pick a scheme to see what it&apos;s buying and selling — or a whole fund house, rolled up. {state.index.monthLabel} · {state.index.entries.filter((e) => e.kind === "house").length} houses · {state.index.entries.filter((e) => e.kind === "fund").length} schemes.
           </div>
+          <Trendsetters list={state.index.trendsetters ?? []} />
           <FundPicker index={state.index} mode="page" />
         </>
       )}
     </>
+  );
+}
+
+/** Discovery strip on the funds landing: funds that tend to buy before the crowd. */
+function Trendsetters({ list }: { list: TrendsetterEntry[] }) {
+  if (!list || list.length === 0) return null;
+  return (
+    <section className="panel" style={{ padding: "16px 18px", marginBottom: 20 }}>
+      <div className="t-section">Trendsetters — funds that buy before the crowd</div>
+      <div className="t-muted" style={{ margin: "2px 0 12px", maxWidth: 740 }}>
+        Funds that repeatedly entered a stock early — when only a handful of funds held it — and then many more piled in over the next few months. Coverage-guarded, so the recent data expansion isn&apos;t mistaken for a crowd. A read on who tends to be ahead, not a recommendation.
+      </div>
+      <div className="ts-grid">
+        {list.slice(0, 9).map((t) => (
+          <button key={t.file} className="ts-card" onClick={() => navigate(`/fund/${t.file}`)}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span className="num" style={{ fontWeight: 700, color: "var(--buy)" }}>{t.score}</span>
+              <span className="t-muted">early calls · {Math.round((100 * t.score) / t.evaluated)}% hit</span>
+            </div>
+            <div className="t-body" style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>{t.name}</div>
+            <div className="t-muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.house}</div>
+            {t.examples.length > 0 && (
+              <div className="t-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Early on {t.examples.slice(0, 2).join(", ")}</div>
+            )}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -196,6 +225,9 @@ function Detail({ summary, index, detail }: { summary: SummaryMeta; index: Funds
           <SectorAllocation alloc={detail.sectorAllocation} scale={scale} />
         </section>
       )}
+
+      {/* 3b. Investing style — cap mix + how it has drifted */}
+      <StyleFingerprint detail={detail} last={last} />
 
       {/* 4. Holdings table */}
       <section style={{ marginTop: 30 }}>
@@ -311,6 +343,86 @@ function SectorAllocation({ alloc, scale }: { alloc: { sector: string; valueInr:
         ))}
       </div>
     </div>
+  );
+}
+
+// ---- Investing style: market-cap mix + drift ----
+
+const CAP_COLORS: Record<string, string> = {
+  large: "var(--sector-1)", mid: "var(--sector-4)", small: "var(--sector-2)", unknown: "var(--sector-other)",
+};
+const CAP_ORDER = ["large", "mid", "small", "unknown"] as const;
+const CAP_NAME: Record<string, string> = { large: "Large cap", mid: "Mid cap", small: "Small cap", unknown: "Unclassified" };
+
+function capMixAt(holdings: FundHoldingTrend[], t: number): { mix: Record<string, number>; total: number } {
+  const mix: Record<string, number> = { large: 0, mid: 0, small: 0, unknown: 0 };
+  let total = 0;
+  for (const h of holdings) {
+    const v = h.valueInr[t];
+    if (v == null || v <= 0) continue;
+    total += v;
+    mix[h.marketCap ?? "unknown"] += v;
+  }
+  return { mix, total };
+}
+
+/** A fund's/house's market-cap tilt (share of equity value) and how it has drifted since we first saw it. */
+function StyleFingerprint({ detail, last }: { detail: FundDetail; last: number }) {
+  const tt = useTooltip();
+  const now = useMemo(() => capMixAt(detail.holdings, last), [detail, last]);
+  const firstIdx = useMemo(() => {
+    for (let t = 0; t < detail.months.length; t++) {
+      if (detail.present[t] && capMixAt(detail.holdings, t).total > 0) return t;
+    }
+    return -1;
+  }, [detail]);
+  const then = firstIdx >= 0 ? capMixAt(detail.holdings, firstIdx) : null;
+
+  if (now.total <= 0) return null;
+  const pct = (cap: string, m: { mix: Record<string, number>; total: number }): number => (m.total > 0 ? (m.mix[cap] / m.total) * 100 : 0);
+
+  const classified = now.total - now.mix.unknown;
+  const lg = classified > 0 ? (now.mix.large / classified) * 100 : 0;
+  const smid = classified > 0 ? ((now.mix.mid + now.mix.small) / classified) * 100 : 0;
+  const style = lg >= 65 ? "Large-cap tilt" : smid >= 65 ? "Mid & small-cap tilt" : "Multi-cap blend";
+
+  let drift: string | null = null;
+  if (then && then.total > 0 && firstIdx !== last) {
+    const d = pct("large", now) - pct("large", then);
+    if (d <= -8) drift = `Moving down the cap curve — large-cap weight down ${Math.abs(d).toFixed(0)} pts since ${detail.monthLabels[firstIdx]} (into smaller companies).`;
+    else if (d >= 8) drift = `Moving up the cap curve — large-cap weight up ${d.toFixed(0)} pts since ${detail.monthLabels[firstIdx]}.`;
+    else drift = `Cap mix steady since ${detail.monthLabels[firstIdx]}.`;
+  }
+
+  return (
+    <section style={{ marginTop: 30 }}>
+      <div className="t-section">Investing style</div>
+      <div className="t-muted" style={{ margin: "2px 0 10px" }}>By market-cap band (share of equity value) · {detail.monthLabels[last]}</div>
+      <div style={{ display: "flex", height: 16, borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
+        {CAP_ORDER.map((cap) => {
+          const p = pct(cap, now);
+          if (p <= 0) return null;
+          return (
+            <div key={cap} style={{ width: `${p}%`, background: CAP_COLORS[cap] }}
+              onMouseEnter={(e) => tt.show(<div><div className="t-label">{CAP_NAME[cap]}</div><div style={{ marginTop: 3 }}>{p.toFixed(1)}%</div></div>, e.clientX, e.clientY)}
+              onMouseMove={(e) => tt.move(e.clientX, e.clientY)} onMouseLeave={tt.hide} />
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 8 }}>
+        {CAP_ORDER.filter((c) => pct(c, now) > 0).map((cap) => (
+          <span key={cap} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span className="sec-dot" style={{ background: CAP_COLORS[cap] }} />
+            <span className="t-body">{CAP_NAME[cap]}</span>
+            <span className="t-muted num">{pct(cap, now).toFixed(1)}%</span>
+          </span>
+        ))}
+      </div>
+      <div className="t-body" style={{ marginTop: 10 }}>
+        <span className="badge" style={{ color: "var(--ink-2)" }}>{style}</span>
+        {drift && <span className="t-muted" style={{ marginLeft: 10 }}>{drift}</span>}
+      </div>
+    </section>
   );
 }
 

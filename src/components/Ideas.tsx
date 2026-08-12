@@ -3,8 +3,10 @@ import type { MarketCap, StockRow, StocksSummary, SummaryMeta } from "../types/h
 import { loadStocks, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
-import { DASH, formatSignedCount } from "../lib/format";
+import { DASH, formatRupee, formatSignedCount } from "../lib/format";
+import { buyStreak, battleground, impliedPrice, monthDiff } from "../lib/signals";
 import { CapFilter, CapPill, capPass } from "./caps";
+import { LineChart } from "./charts";
 import { TrendSpark } from "./Trend";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -60,6 +62,11 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
     const c = s.fundCount[L];
     return (c != null && c <= 3) || (s.topHolder != null && s.topHolder.sharePct >= 70);
   }), [all, L]);
+  const crowded = useMemo(() => all.filter((s) => (s.fundCount[L] ?? 0) >= 2), [all, L]);
+  // Quiet accumulation: net-bought for ≥2 recent months in a row (steady, not a spike).
+  const accumulation = useMemo(() => all.filter((s) => buyStreak(s.netShareChange) >= 2), [all]);
+  // Battleground: many funds buying AND many selling the same stock this month.
+  const battle = useMemo(() => all.filter((s) => { const b = battleground(s); return b != null && b >= 3; }), [all]);
 
   const spark = (r: StockRow) => (
     <TrendSpark values={r.totalShares} title={r.name} subtitle="Total shares held across all funds" monthLabels={stocks.monthLabels} />
@@ -67,9 +74,10 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
   const stockCol: Col = { label: "Stock", render: (r) => <StockCell r={r} scale={scale} /> };
   const trendCol: Col = { label: "Trend", render: spark };
   const netCol: Col = { label: "Net change", align: "right", sortValue: (r) => r.netShareChange[L], render: (r) => <Change v={r.netShareChange[L]} note={coverageNote(r)} /> };
+  const priceNow = (r: StockRow) => impliedPrice(r.totalValueInr, r.totalShares)[L];
 
   const [sub, setSub] = useState(0);
-  const SUBS = ["Buying & selling", "Brand-new entries", "Turned around", "Held by few funds"];
+  const SUBS = ["Quiet accumulation", "Buying & selling", "Battleground", "Brand-new entries", "Turned around", "Ownership & crowding", "Follow the funds"];
 
   return (
     <div>
@@ -84,6 +92,25 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
       </div>
 
       {sub === 0 && (
+        <Section title="Quiet accumulation" subtitle="Stocks funds have net-bought several months in a row — steady building, not a one-month spike. The longer the run, the stronger the conviction. This is the “smart money quietly moving in” list.">
+          {accumulation.length === 0 ? <Empty>No multi-month accumulation yet.</Empty> : (
+            <RankedTable
+              rows={accumulation}
+              grid="minmax(190px,2fr) 120px 150px 84px 76px"
+              initialSort={1} initialDir={-1}
+              columns={[
+                stockCol,
+                { label: "Months buying", align: "right", sortValue: (r) => buyStreak(r.netShareChange), render: (r) => <Streak n={buyStreak(r.netShareChange)} /> },
+                netCol,
+                { label: "Funds", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
+                trendCol,
+              ]}
+            />
+          )}
+        </Section>
+      )}
+
+      {sub === 1 && (
         <Section title="Funds are buying / selling these" subtitle="The biggest net buys and net sells this month. The more funds moving the same way, the broader the signal.">
           <SubLabel color="var(--buy)">Buying</SubLabel>
           <RankedTable
@@ -102,7 +129,25 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
         </Section>
       )}
 
-      {sub === 1 && (
+      {sub === 2 && (
+        <Section title="Battleground stocks" subtitle="Funds disagree — lots of funds buying AND lots selling the same stock this month. Where the smart money is split, ranked by the number on the smaller side (the more contested, the higher).">
+          {battle.length === 0 ? <Empty>No contested names this month.</Empty> : (
+            <RankedTable
+              rows={battle}
+              grid="minmax(200px,2fr) 150px 140px 76px"
+              initialSort={1} initialDir={-1}
+              columns={[
+                stockCol,
+                { label: "Split (add · trim)", align: "right", sortValue: (r) => battleground(r), render: (r) => <AddTrim r={r} /> },
+                netCol,
+                trendCol,
+              ]}
+            />
+          )}
+        </Section>
+      )}
+
+      {sub === 3 && (
         <Section title="Brand-new to mutual funds" subtitle={`Stocks funds started holding this month. Our data starts ${firstMonth}, so “new” means first seen since then — coverage changes are excluded.`}>
           {newEntries.length === 0 ? (
             <Empty>No brand-new entries this month.</Empty>
@@ -122,7 +167,7 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
         </Section>
       )}
 
-      {sub === 2 && (
+      {sub === 4 && (
         <Section title="Turned around" subtitle="Flow flipped direction — net selling then net buying, or the reverse. The sparkline shows the turn; this gets richer after more months of history.">
           {turned.length === 0 ? (
             <Empty>No turnarounds yet — needs a few months of history.</Empty>
@@ -142,22 +187,111 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
         </Section>
       )}
 
-      {sub === 3 && (
-        <Section title="Held by only a few funds" subtitle="Under-owned names — held by just 1–3 funds, or where one fund owns most of the fund-held shares. The contrarian / unique picks.">
+      {sub === 5 && (
+        <>
+          <Section title="Crowd favourites" subtitle="The most widely-held names — owned by the most funds this month. Crowded trades: broad conviction, but a lot of funds to head for the exit at once.">
+            <RankedTable
+              rows={crowded}
+              grid="minmax(200px,2fr) 90px 150px 76px"
+              initialSort={1} initialDir={-1}
+              columns={[
+                stockCol,
+                { label: "Funds", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
+                netCol,
+                trendCol,
+              ]}
+            />
+          </Section>
+          <Section title="Held by only a few funds" subtitle="The other end — under-owned names held by just 1–3 funds, or where one fund owns most of the fund-held shares. The contrarian / unique picks.">
+            <RankedTable
+              rows={fewFunds}
+              grid="minmax(200px,2fr) 90px minmax(150px,1fr) 76px"
+              initialSort={1} initialDir={1}
+              columns={[
+                stockCol,
+                { label: "Funds", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
+                { label: "Biggest holder", sortValue: (r) => r.topHolder?.sharePct ?? null, render: (r) => <TopHolder r={r} /> },
+                trendCol,
+              ]}
+            />
+          </Section>
+        </>
+      )}
+
+      {sub === 6 && <FollowTheFunds all={all} L={L} labels={stocks.monthLabels} stockCol={stockCol} netCol={netCol} trendCol={trendCol} priceNow={priceNow} />}
+    </div>
+  );
+}
+
+/**
+ * "Follow the funds" — the consensus basket. Takes this month's 10 biggest net
+ * buys and plots the equal-weight average of their IMPLIED price (value ÷ shares),
+ * indexed to 100 at each stock's first month. It's a read on whether the crowd's
+ * current favourites are already moving — illustrative, not a realised return.
+ */
+function FollowTheFunds({
+  all, L, labels, stockCol, netCol, trendCol, priceNow,
+}: {
+  all: StockRow[]; L: number; labels: string[];
+  stockCol: Col; netCol: Col; trendCol: Col; priceNow: (r: StockRow) => number | null;
+}) {
+  const top = useMemo(
+    () => [...all].filter((s) => (s.netShareChange[L] ?? 0) > 0).sort((a, b) => (b.netShareChange[L] ?? 0) - (a.netShareChange[L] ?? 0)).slice(0, 10),
+    [all, L],
+  );
+  const index = useMemo(() => {
+    const prices = top.map((s) => impliedPrice(s.totalValueInr, s.totalShares));
+    const bases = prices.map((p) => p.find((x) => x != null) ?? null);
+    const out: (number | null)[] = [];
+    for (let t = 0; t < labels.length; t++) {
+      let sum = 0, cnt = 0;
+      for (let k = 0; k < prices.length; k++) {
+        const b = bases[k], pt = prices[k][t];
+        if (b != null && b > 0 && pt != null) { sum += (pt / b) * 100; cnt++; }
+      }
+      out.push(cnt ? sum / cnt : null);
+    }
+    return out;
+  }, [top, labels.length]);
+
+  return (
+    <Section title="Follow the funds — the consensus basket" subtitle="This month's 10 most net-bought stocks. The line is their equal-weight average price (value ÷ shares), indexed to 100 at the start — a way to see if the crowd's picks are already running. Illustrative, not a realised return.">
+      {top.length === 0 ? <Empty>No consensus buys this month.</Empty> : (
+        <>
+          <div className="panel" style={{ padding: "14px 16px", marginBottom: 14 }}>
+            <LineChart
+              values={index}
+              labels={labels}
+              netChanges={monthDiff(index)}
+              format={(n) => (n == null ? DASH : n.toFixed(1))}
+              formatShort={(n) => (n == null ? DASH : n.toFixed(0))}
+              formatChange={(n) => (n == null ? DASH : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(1)}`)}
+              seriesLabel="Basket price (100 = start)"
+              changeLabel="Month change"
+            />
+          </div>
           <RankedTable
-            rows={fewFunds}
-            grid="minmax(200px,2fr) 90px minmax(150px,1fr) 76px"
-            initialSort={1} initialDir={1}
+            rows={top}
+            grid="minmax(200px,2fr) 150px 110px 76px"
+            initialSort={1} initialDir={-1}
             columns={[
               stockCol,
-              { label: "Funds", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
-              { label: "Biggest holder", sortValue: (r) => r.topHolder?.sharePct ?? null, render: (r) => <TopHolder r={r} /> },
+              netCol,
+              { label: "Price now", align: "right", sortValue: (r) => priceNow(r), render: (r) => <span className="num t-body">{formatRupee(priceNow(r))}</span> },
               trendCol,
             ]}
           />
-        </Section>
+        </>
       )}
-    </div>
+    </Section>
+  );
+}
+
+function Streak({ n }: { n: number }) {
+  return (
+    <span className="num t-body" style={{ color: "var(--buy)", fontWeight: 600 }}>
+      {n} mo{n >= 6 ? " 🔥" : ""}
+    </span>
   );
 }
 

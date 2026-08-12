@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import type {
   MonthData,
+  FundHoldings,
   SummaryMeta,
   StocksSummary,
   StockRow,
@@ -37,6 +38,7 @@ import type {
   FundIndexEntry,
   FundDetail,
   FundHoldingTrend,
+  TrendsetterEntry,
 } from "../src/types/holdings.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -165,18 +167,39 @@ function isEquity(isin: string, sector: string | null): boolean {
   return true;
 }
 
+/** Normalise a scheme name to a stable key fragment (for de-collapsing, below). */
+const normName = (s: string): string =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+
 function indexMonth(data: MonthData): MonthIndex {
   const funds = new Map<string, MonthFund>();
   const houses = new Set<string>();
   const holders = new Map<string, string[]>();
 
+  // A few AdvisorKhoj months collapsed several DISTINCT schemes onto one fundId
+  // (the scraper read the wrong cell as the scheme code, e.g. every Motilal Oswal
+  // scheme became ":Back to Index"). Where one fundId carries multiple distinct
+  // scheme names, split them back apart by name so per-fund views and fund COUNTS
+  // stay honest. Stock/house TOTALS are unaffected — a house's schemes sum the
+  // same either way. The fundId PREFIX (the AMC slug) is preserved, and the newest
+  // month (AMFIBEAS) has no collisions, so fund URLs/identities are unchanged there.
+  const namesById = new Map<string, Set<string>>();
+  for (const f of data.funds) {
+    let set = namesById.get(f.fundId);
+    if (!set) namesById.set(f.fundId, (set = new Set()));
+    set.add(f.fundName);
+  }
+  const keyOf = (f: FundHoldings): string =>
+    (namesById.get(f.fundId)?.size ?? 0) > 1 ? `${f.fundId}::${normName(f.fundName)}` : f.fundId;
+
   for (const f of data.funds) {
     const amcSlug = amcSlugOf(f.fundId);
     houses.add(amcSlug);
-    let mf = funds.get(f.fundId);
+    const fundKey = keyOf(f);
+    let mf = funds.get(fundKey);
     if (!mf) {
       mf = { amcSlug, fundName: f.fundName, fundHouse: f.fundHouse, holds: new Map() };
-      funds.set(f.fundId, mf);
+      funds.set(fundKey, mf);
     }
     for (const h of f.holdings) {
       if (!isEquity(h.isin, h.sector)) continue; // equity shares only — drop bonds/debt
@@ -194,7 +217,7 @@ function indexMonth(data: MonthData): MonthIndex {
         });
         let list = holders.get(h.isin);
         if (!list) holders.set(h.isin, (list = []));
-        list.push(f.fundId);
+        list.push(fundKey);
       }
     }
   }
@@ -583,6 +606,53 @@ function main(): void {
   fundIndex.sort((a, b) =>
     a.kind !== b.kind ? (a.kind === "house" ? -1 : 1) : a.name.localeCompare(b.name));
 
+  // ---- Trendsetter funds: who tends to buy a stock BEFORE the crowd ----
+  // For each stock, at each month a fund newly enters it (from a small, uncrowded
+  // base), check whether many more funds pile in over the next 1–3 months —
+  // counting ONLY funds whose house was already present at entry, so the big
+  // AMFIBEAS onboarding month can't masquerade as "the crowd following".
+  const tsScore = new Map<string, number>();
+  const tsEval = new Map<string, number>();
+  const tsEx = new Map<string, string[]>();
+  for (const isin of isins) {
+    for (let t = 1; t <= L - 1; t++) {
+      const holdersAtT = idx[t].holders.get(isin) ?? [];
+      const baseCount = holdersAtT.length;
+      if (baseCount === 0 || baseCount > 20) continue; // must be an early, uncrowded name
+      const housesAtT = idx[t].houses;
+      let maxLater = baseCount;
+      const kmax = Math.min(3, L - t);
+      for (let k = 1; k <= kmax; k++) {
+        let later = 0;
+        for (const id of idx[t + k].holders.get(isin) ?? []) if (housesAtT.has(amcSlugOf(id))) later++;
+        if (later > maxLater) maxLater = later;
+      }
+      const followed = maxLater - baseCount >= 5; // crowd grew ≥5 funds (stable universe)
+      const prevSet = new Set(idx[t - 1].holders.get(isin) ?? []);
+      for (const id of holdersAtT) {
+        if (!idx[t - 1].houses.has(amcSlugOf(id))) continue; // house comparable at entry
+        if (prevSet.has(id)) continue; // already held → not a new entry
+        if (!idx[L].funds.has(id)) continue; // must still exist (has a detail page)
+        tsEval.set(id, (tsEval.get(id) ?? 0) + 1);
+        if (followed) {
+          tsScore.set(id, (tsScore.get(id) ?? 0) + 1);
+          const ex = tsEx.get(id) ?? [];
+          if (ex.length < 3) { ex.push(nameOf.get(isin) ?? isin); tsEx.set(id, ex); }
+        }
+      }
+    }
+  }
+  const trendsetters: TrendsetterEntry[] = [...tsScore.entries()]
+    // ≥2 correct early calls, and a real hit rate (≥15%) so mechanical index funds
+    // — early on everything but rarely by conviction — don't dominate.
+    .filter(([id, sc]) => sc >= 2 && sc / (tsEval.get(id) ?? sc) >= 0.15)
+    .map(([id, sc]) => {
+      const mf = idx[L].funds.get(id)!;
+      return { file: fundFileKey("fund", id), name: mf.fundName, house: mf.fundHouse, score: sc, evaluated: tsEval.get(id) ?? sc, examples: tsEx.get(id) ?? [] };
+    })
+    .sort((a, b) => b.score - a.score || b.score / b.evaluated - a.score / a.evaluated)
+    .slice(0, 25);
+
   // ---- write outputs ----
   mkdirSync(OUT_DIR, { recursive: true });
   rmSync(DETAIL_DIR, { recursive: true, force: true });
@@ -632,7 +702,7 @@ function main(): void {
 
   const latestMeta = summary.months[summary.months.length - 1];
   const fundsIndexOut: FundsIndex = {
-    schemaVersion: SCHEMA, month: latestMeta.month, monthLabel: latestMeta.label, entries: fundIndex,
+    schemaVersion: SCHEMA, month: latestMeta.month, monthLabel: latestMeta.label, entries: fundIndex, trendsetters,
   };
   writeFileSync(resolve(OUT_DIR, "funds.json"), JSON.stringify(fundsIndexOut)); // minified — machine-loaded
   for (const f of fundDetails) {

@@ -290,4 +290,36 @@
     border: 1px solid var(--muted); border-radius: 999px; font-size: 9px; font-weight: 700;
     color: var(--muted); cursor: help; margin-left: 6px; vertical-align: middle;
   }
+
+  /* ---- segmented control (Total/By-fund, Shares/Value/Price switches) ---- */
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg-btn {
+    background: none; border: 0; border-right: 1px solid var(--border);
+    padding: 5px 12px; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer; white-space: nowrap;
+  }
+  .seg-btn:last-child { border-right: 0; }
+  .seg-btn:hover { color: var(--ink); }
+  .seg-btn[data-active="true"] { background: var(--ink); color: var(--surface); }
+
+  /* ---- small info callout (split/bonus note) ---- */
+  .callout-i {
+    font-size: 12px; color: var(--ink-2); background: var(--flat);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  }
+
+  /* ---- sector rotation heatmap ---- */
+  .rot-row { display: grid; grid-template-columns: 132px 1fr; align-items: center; column-gap: 10px; min-height: 20px; margin-bottom: 3px; }
+  .rot-label { text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+  .rot-cells { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+  .rot-cell { height: 16px; border-radius: 2px; cursor: default; }
+  .rot-axis { text-align: center; font-size: 10px; white-space: nowrap; overflow: visible; }
+
+  /* ---- trendsetter cards (funds landing) ---- */
+  .ts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 760px) { .ts-grid { grid-template-columns: 1fr; } }
+  .ts-card {
+    text-align: left; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px; cursor: pointer; min-width: 0;
+  }
+  .ts-card:hover { background: var(--flat); border-color: var(--axis); }
 }

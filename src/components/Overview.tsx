@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import type { SectorSummary, StocksSummary, SummaryMeta } from "../types/holdings";
+import type { SectorRow, SectorSummary, StocksSummary, SummaryMeta } from "../types/holdings";
 import { buildReport, CAP_LABEL } from "../lib/report";
 import { DASH, formatSignedCount } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -60,7 +60,78 @@ export function Overview({ data }: { data: { summary: SummaryMeta; stocks: Stock
       <Panel title="Market breadth" subtitle={`How many stocks funds net-bought vs net-sold · ${model.breadth.measured} measured this month`}>
         <Breadth bought={model.breadth.bought} sold={model.breadth.sold} flat={model.breadth.flat} />
       </Panel>
+
+      <Panel title="Sector rotation" subtitle="Where money flowed each month — green in, red out. Read across a row to see a sector heat up or cool; down a column to see that month's rotation.">
+        <SectorRotation sectors={data.sectors.sectors} labels={data.sectors.monthLabels} />
+      </Panel>
     </section>
+  );
+}
+
+/** Heatmap of sector net share-flow by month: rows = sectors, columns = months. */
+function SectorRotation({ sectors, labels }: { sectors: SectorRow[]; labels: string[] }) {
+  const tt = useTooltip();
+  // Order sectors by total activity (biggest movers on top); drop empties.
+  const rows = useMemo(() => {
+    const withMag = sectors.map((s) => ({
+      s,
+      mag: s.netShareChange.reduce<number>((a, v) => a + (v == null ? 0 : Math.abs(v)), 0),
+    }));
+    return withMag.filter((r) => r.mag > 0).sort((a, b) => b.mag - a.mag).map((r) => r.s);
+  }, [sectors]);
+  const max = useMemo(() => {
+    let m = 1;
+    for (const s of sectors) for (const v of s.netShareChange) if (v != null) m = Math.max(m, Math.abs(v));
+    return m;
+  }, [sectors]);
+
+  const T = labels.length;
+  const step = Math.max(1, Math.ceil(T / 8));
+
+  if (rows.length === 0) return <div className="t-muted">Not enough history yet.</div>;
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <div style={{ minWidth: 520 }}>
+        {rows.map((s) => (
+          <div key={s.sector} className="rot-row">
+            <div className="rot-label t-body" title={s.sector}>{s.sector}</div>
+            <div className="rot-cells">
+              {s.netShareChange.map((v, t) => {
+                const intensity = v == null ? 0 : Math.min(1, Math.abs(v) / max);
+                const bg = v == null || v === 0 ? "transparent" : v > 0 ? "var(--buy)" : "var(--sell)";
+                return (
+                  <div
+                    key={t}
+                    className="rot-cell"
+                    style={{ background: bg, opacity: v == null ? 1 : 0.15 + intensity * 0.85, border: v == null ? "1px solid var(--grid)" : "none" }}
+                    onMouseEnter={(e) => tt.show(
+                      <div>
+                        <div className="t-label">{s.sector}</div>
+                        <div className="t-muted">{labels[t]}</div>
+                        <div style={{ marginTop: 3, color: v == null ? "var(--muted)" : v > 0 ? "var(--buy)" : "var(--sell)" }}>
+                          {v == null ? "No comparable data" : `${v > 0 ? "▲ in" : "▼ out"} ${formatSignedCount(v)} shares`}
+                        </div>
+                      </div>, e.clientX, e.clientY,
+                    )}
+                    onMouseMove={(e) => tt.move(e.clientX, e.clientY)}
+                    onMouseLeave={tt.hide}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="rot-row" style={{ marginTop: 4 }}>
+          <div className="rot-label" />
+          <div className="rot-cells">
+            {labels.map((l, t) => (
+              <div key={t} className="rot-axis t-muted">{t === 0 || t === T - 1 || t % step === 0 ? `${l.slice(0, 3)} '${l.slice(-2)}` : ""}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

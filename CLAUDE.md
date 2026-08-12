@@ -130,10 +130,26 @@ the browser loads. Pure recomputation, no network. Served files (`public/data`):
 - `sectors.json` — net share-change summed by sector, per month.
 - `stocks/<ISIN>.json` — per-stock fund-by-fund detail, loaded on demand.
 - `funds.json` — the fund/house picker index: every scheme + AMC present in the
-  latest month, with its stock count and equity value.
+  latest month, with its stock count and equity value. Plus `trendsetters`: funds
+  that repeatedly entered a stock BEFORE the crowd (coverage-guarded lead–lag, so
+  the AMFIBEAS onboarding month can't masquerade as "the crowd following").
 - `funds/<key>.json` — per-fund AND per-house holdings over time (the flip side of
   the stock page), loaded on demand. `stocks/` and `funds/` are git-ignored —
   bulky and reproducible; regenerated on deploy.
+
+**De-collapse (a data-hygiene fix in derive).** A few AdvisorKhoj months collapsed
+several DISTINCT schemes onto one `fundId` (the scraper mis-read the scheme-code
+cell — e.g. every Motilal Oswal scheme became `:Back to Index`). `indexMonth`
+splits them back apart by scheme name where one `fundId` carries multiple names,
+so per-fund views and fund COUNTS stay honest. Stock/house TOTALS are unaffected
+(a house's schemes sum the same either way); the newest month (AMFIBEAS) has no
+such collisions. This is retroactive — no re-scrape needed.
+
+**Presentation-only signals (`src/lib/signals.ts`).** Readings computed at display
+time from the already-served arrays — no new data, no change to stored numbers:
+implied price (value ÷ shares, no external feed), buy/sell streaks (the "quiet
+accumulation" list), battleground intensity (funds split), split/bonus detection,
+entry/exit counts. Coverage-aware inputs mean a `null` month breaks a streak.
 
 **Coverage-awareness (the core Step-3 rule).** A month-over-month change is only
 computed from funds whose fund HOUSE is present in BOTH months. If a house is a
@@ -177,7 +193,8 @@ src/
   components/FundView.tsx  Per-fund / per-house view (picker, activity, holdings, allocation)
   types/holdings.ts        Data types (raw + derived; the format contract)
   lib/data.ts              Runtime loaders: loadSummary/loadStocks/loadSectors/loadStockDetail/loadFunds*
-  lib/format.ts            Display helpers: DASH, formatInr, formatPercent, formatCount, formatSignedCount
+  lib/format.ts            Display helpers: DASH, formatInr/formatRupee, formatPercent, formatCount, formatSignedCount
+  lib/signals.ts           Presentation-only signals: impliedPrice, buy/sellStreak, battleground, detectSplit, entryExitCounts
 public/
   favicon.svg
   data/                    SERVED summaries only (small)
@@ -222,11 +239,18 @@ Build this project one step at a time. Everything is EQUITY only (derive keeps
 ISINs whose security-type is "01"). The UI follows a fixed design system (tokens
 in `src/index.css`: one font, standardized sizes, the palette, sector colours,
 chart-mark rules) — use it exactly; never invent colours or fonts. The app is
-**tabbed**, path-based: `/` Overview (macro flows only), `/stocks` the table,
-`/funds` the picker, `/ideas` the idea lists (with subtabs — the biggest-mover
-leaderboards live ONLY here), plus `/stock/<ISIN>` and `/fund/<key>` detail pages.
-Numbers use one format everywhere: crore/lakh and percents to 1 decimal, counts
-as integers, always a +/− sign and ▲/▼ on changes, "—" for unknown.
+**tabbed**, path-based: `/` Overview (macro flows only, incl. a **sector-rotation
+heatmap**), `/stocks` the table, `/funds` the picker (topped by the **Trendsetters**
+strip), `/ideas` the idea lists (subtabs: Quiet accumulation · Buying & selling ·
+Battleground · Brand-new · Turned around · Ownership & crowding · Follow the funds —
+the biggest-mover leaderboards live ONLY here), plus `/stock/<ISIN>` and
+`/fund/<key>` detail pages. The stock page's trend chart toggles **Total** (shares /
+value / implied price) vs **By fund** (a picked fund's own shares / % of portfolio),
+and carries an **Ownership over time** panel (fund-count trend + entry/exit
+timeline); the fund page carries an **Investing style** cap-mix fingerprint. Every
+sparkline is clickable (chart + real numbers). Numbers use one format everywhere:
+crore/lakh and percents to 1 decimal, counts as integers, always a +/− sign and
+▲/▼ on changes, "—" for unknown.
 
 **Export** is presentation-only (never touches data/analysis; `src/lib/report.ts`
 aggregates the existing summaries): **Excel** (`exportExcel.ts`, `exceljs`

@@ -23,6 +23,13 @@ export function formatInr(rupees: number | null | undefined): string {
   return `${sign}₹${abs.toLocaleString("en-IN")}`;
 }
 
+/** Plain rupee amount with Indian grouping and optional decimals, e.g. 1307.7 → "₹1,308". Dash if unknown. */
+export function formatRupee(value: number | null | undefined, dp = 0): string {
+  if (value == null || !Number.isFinite(value)) return DASH;
+  const sign = value < 0 ? "−" : "";
+  return `${sign}₹${Math.abs(value).toLocaleString("en-IN", { minimumFractionDigits: dp, maximumFractionDigits: dp })}`;
+}
+
 /** Format a percentage with exactly one decimal, e.g. 8.42 → "8.4%". Dash if unknown. */
 export function formatPercent(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return DASH;

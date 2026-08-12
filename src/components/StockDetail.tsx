@@ -3,12 +3,15 @@ import type { FundTrend, StockDetail, SummaryMeta } from "../types/holdings";
 import { fundFileKey, loadStockDetail, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale } from "../lib/palette";
-import { DASH, formatCountShort, formatPercent, formatSignedCount } from "../lib/format";
+import { DASH, formatCount, formatCountShort, formatInr, formatPercent, formatRupee, formatSignedCount } from "../lib/format";
+import { impliedPrice, monthDiff, detectSplit, entryExitCounts } from "../lib/signals";
 import { CapPill } from "./caps";
-import { LineChart, NetBars } from "./charts";
+import { LineChart, NetBars, EntryExitBars } from "./charts";
 import { TrendSpark } from "./Trend";
 import { ThemeToggle } from "./ThemeToggle";
 import { useTooltip } from "./Tooltip";
+
+const rupee = formatRupee;
 
 type State =
   | { status: "loading" }
@@ -79,26 +82,166 @@ function Detail({ summary, detail }: { summary: SummaryMeta; detail: StockDetail
         this month · held by <strong style={{ color: "var(--ink)" }}>{detail.fundCount[last] ?? DASH}</strong> funds — {buying} buying, {selling} selling
       </div>
 
-      {/* 2. Total shares line chart */}
-      <section style={{ marginTop: 28 }}>
-        <div className="t-section">Total shares held</div>
-        <div className="t-muted" style={{ margin: "2px 0 8px" }}>Across all mutual funds, month by month</div>
-        <LineChart values={detail.totalShares} labels={detail.monthLabels} netChanges={detail.netShareChange} />
-      </section>
+      {/* 2. Main chart — total (shares / value / price) OR one fund's own trend */}
+      <StockChart detail={detail} />
 
       {/* 3. Monthly net-change bars */}
       <section style={{ marginTop: 24 }}>
-        <div className="t-section">Monthly net change</div>
-        <div className="t-muted" style={{ margin: "2px 0 8px" }}>Green when funds net-bought, red when they net-sold</div>
+        <div className="t-section">Monthly net buying &amp; selling</div>
+        <div className="t-muted" style={{ margin: "2px 0 8px" }}>Green when funds net-bought that month, red when they net-sold</div>
         <NetBars values={detail.netShareChange} labels={detail.monthLabels} />
       </section>
 
-      {/* 4. Funds table */}
+      {/* 4. Ownership over time — how many funds hold it, and who joined/left */}
+      <OwnershipTrend detail={detail} />
+
+      {/* 5. Funds table */}
       <section style={{ marginTop: 28 }}>
         <div className="t-section" style={{ marginBottom: 10 }}>Funds holding this stock</div>
         <FundsTable funds={detail.funds} last={last} labels={detail.monthLabels} />
       </section>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main trend chart: Total (shares / value / implied price) OR one fund's own
+// line (shares / % of portfolio). This is the "by mutual fund vs total" toggle.
+// ---------------------------------------------------------------------------
+
+function StockChart({ detail }: { detail: StockDetail }) {
+  const last = detail.months.length - 1;
+  const [mode, setMode] = useState<"total" | "fund">("total");
+  const [totalMetric, setTotalMetric] = useState<"shares" | "value" | "price">("shares");
+  const [fundMetric, setFundMetric] = useState<"shares" | "percent">("shares");
+  const [fundId, setFundId] = useState<string>("");
+
+  const price = useMemo(() => impliedPrice(detail.totalValueInr, detail.totalShares), [detail]);
+  const split = useMemo(() => detectSplit(detail.totalShares, price), [detail, price]);
+  const holders = useMemo(
+    () => detail.funds.filter((f) => (f.shares[last] ?? 0) > 0).sort((a, b) => (b.shares[last] ?? 0) - (a.shares[last] ?? 0)),
+    [detail.funds, last],
+  );
+  useEffect(() => { if (mode === "fund" && !fundId && holders[0]) setFundId(holders[0].fundId); }, [mode, fundId, holders]);
+
+  const fund = detail.funds.find((f) => f.fundId === fundId);
+
+  // Pick the series + formatters for the active mode/metric.
+  let values: (number | null)[];
+  let changes: (number | null)[];
+  let format: (n: number | null | undefined) => string;
+  let formatShort: (n: number | null | undefined) => string;
+  let formatChange: (n: number | null | undefined) => string;
+  let seriesLabel: string;
+  let sub: string;
+
+  if (mode === "total") {
+    if (totalMetric === "shares") {
+      values = detail.totalShares; changes = detail.netShareChange;
+      format = formatCount; formatShort = formatCountShort; formatChange = formatSignedCount;
+      seriesLabel = "Total shares"; sub = "Total shares held across all mutual funds, month by month";
+    } else if (totalMetric === "value") {
+      values = detail.totalValueInr; changes = monthDiff(detail.totalValueInr);
+      format = (n) => formatInr(n); formatShort = (n) => formatInr(n); formatChange = (n) => (n == null ? DASH : `${n >= 0 ? "+" : "−"}${formatInr(Math.abs(n)).replace("₹", "₹")}`);
+      seriesLabel = "Total value"; sub = "Total ₹ value across all funds — rises with buying and with price";
+    } else {
+      values = price; changes = monthDiff(price);
+      format = (n) => rupee(n, 1); formatShort = (n) => rupee(n, 0); formatChange = (n) => (n == null ? DASH : `${n >= 0 ? "+" : "−"}${rupee(Math.abs(n), 1).slice(1)}`);
+      seriesLabel = "Implied price"; sub = "Price the funds' disclosures imply (value ÷ shares) — no external price feed";
+    }
+  } else if (fund) {
+    if (fundMetric === "shares") {
+      values = fund.shares; changes = fund.change;
+      format = formatCount; formatShort = formatCountShort; formatChange = formatSignedCount;
+      seriesLabel = "Shares held"; sub = `Shares held by ${fund.fundName}, month by month`;
+    } else {
+      values = fund.percent; changes = monthDiff(fund.percent);
+      format = (n) => formatPercent(n); formatShort = (n) => formatPercent(n); formatChange = (n) => (n == null ? DASH : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(1)}%`);
+      seriesLabel = "% of portfolio"; sub = `${fund.fundName} — this stock's weight in the fund's portfolio`;
+    }
+  } else {
+    values = []; changes = []; format = formatCount; formatShort = formatCountShort; formatChange = formatSignedCount;
+    seriesLabel = ""; sub = "Pick a fund below.";
+  }
+
+  return (
+    <section style={{ marginTop: 28 }}>
+      <div className="flex flex-wrap items-start gap-2" style={{ justifyContent: "space-between" }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="t-section">Trend over time</div>
+          <div className="t-muted" style={{ margin: "2px 0 10px", maxWidth: 620 }}>{sub}</div>
+        </div>
+        <div className="seg">
+          <button className="seg-btn" data-active={mode === "total"} onClick={() => setMode("total")}>Total</button>
+          <button className="seg-btn" data-active={mode === "fund"} onClick={() => setMode("fund")}>By fund</button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: 10 }}>
+        {mode === "total" ? (
+          <div className="seg">
+            {(["shares", "value", "price"] as const).map((m) => (
+              <button key={m} className="seg-btn" data-active={totalMetric === m} onClick={() => setTotalMetric(m)}>
+                {m === "shares" ? "Shares" : m === "value" ? "Value ₹" : "Price"}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
+            <select className="searchbox" value={fundId} onChange={(e) => setFundId(e.target.value)} style={{ maxWidth: 340 }}>
+              {holders.map((f) => <option key={f.fundId} value={f.fundId}>{f.fundName} · {f.fundHouse}</option>)}
+            </select>
+            <div className="seg">
+              {(["shares", "percent"] as const).map((m) => (
+                <button key={m} className="seg-btn" data-active={fundMetric === m} onClick={() => setFundMetric(m)}>
+                  {m === "shares" ? "Shares" : "% of fund"}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {mode === "total" && totalMetric !== "value" && split && (
+        <div className="callout-i" style={{ marginBottom: 10 }}>
+          Around <strong>{detail.monthLabels[split.index]}</strong> shares jumped ~{split.ratio}× while the implied price fell in step — likely a bonus/split, not fund buying.
+        </div>
+      )}
+
+      {values.length > 0
+        ? <LineChart values={values} labels={detail.monthLabels} netChanges={changes} format={format} formatShort={formatShort} formatChange={formatChange} seriesLabel={seriesLabel} changeLabel="Change" />
+        : <div className="t-muted">No fund selected.</div>}
+    </section>
+  );
+}
+
+function OwnershipTrend({ detail }: { detail: StockDetail }) {
+  const { entered, exited } = useMemo(() => entryExitCounts(detail.funds, detail.months.length), [detail]);
+  const anyEvents = entered.some((n) => n > 0) || exited.some((n) => n > 0);
+  return (
+    <section style={{ marginTop: 24 }}>
+      <div className="t-section">Ownership over time</div>
+      <div className="t-muted" style={{ margin: "2px 0 8px" }}>How many funds hold it — and how many entered or exited each month</div>
+      <div className="panel" style={{ padding: "14px 16px" }}>
+        <div className="t-label" style={{ color: "var(--ink-2)", marginBottom: 6 }}>Funds holding, month by month</div>
+        <LineChart
+          values={detail.fundCount}
+          labels={detail.monthLabels}
+          netChanges={monthDiff(detail.fundCount)}
+          format={formatCount}
+          formatShort={(n) => (n == null ? DASH : String(Math.round(n)))}
+          formatChange={formatSignedCount}
+          seriesLabel="Funds holding"
+          changeLabel="Change"
+        />
+        {anyEvents && (
+          <>
+            <div className="t-label" style={{ color: "var(--ink-2)", margin: "16px 0 6px" }}>Funds entering (▲) vs exiting (▼) each month</div>
+            <EntryExitBars entered={entered} exited={exited} labels={detail.monthLabels} />
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 
