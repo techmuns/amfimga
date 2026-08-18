@@ -98,7 +98,7 @@
   /* Funds table on the stock detail page. */
   .fund-grid {
     display: grid;
-    grid-template-columns: minmax(200px, 2fr) 120px 150px 84px 76px 96px;
+    grid-template-columns: minmax(180px, 2fr) 112px 116px 122px 78px 70px 90px;
     align-items: center;
     column-gap: 12px;
   }

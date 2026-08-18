@@ -46,6 +46,22 @@ export function buyStreak(net: (number | null)[]): number {
   return n;
 }
 
+/**
+ * Net share change accumulated over the last `months` entries — the "adding over
+ * a period of time" read that cuts through one-month churn. Nulls (coverage gaps /
+ * corporate actions) are skipped, so it stays coverage-aware; returns `null` only
+ * when no month in the window is known.
+ */
+export function recentAccumulation(change: (number | null)[], months: number): number | null {
+  let sum = 0;
+  let known = false;
+  for (let i = Math.max(0, change.length - months); i < change.length; i++) {
+    const v = change[i];
+    if (v != null) { sum += v; known = true; }
+  }
+  return known ? sum : null;
+}
+
 /** The mirror of {@link buyStreak}: unbroken run of most-recent net-selling months. */
 export function sellStreak(net: (number | null)[]): number {
   let n = 0;

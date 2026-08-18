@@ -132,7 +132,10 @@ the browser loads. Pure recomputation, no network. Served files (`public/data`):
 - `funds.json` — the fund/house picker index: every scheme + AMC present in the
   latest month, with its stock count and equity value. Plus `trendsetters`: funds
   that repeatedly entered a stock BEFORE the crowd (coverage-guarded lead–lag, so
-  the AMFIBEAS onboarding month can't masquerade as "the crowd following").
+  the AMFIBEAS onboarding month can't masquerade as "the crowd following"). Plus
+  `consensus`: the stocks the biggest active funds commonly own and are still
+  net-adding (shared conviction — the flip side of one-month churn; "held by X of
+  the top N funds, Y still adding").
 - `funds/<key>.json` — per-fund AND per-house holdings over time (the flip side of
   the stock page), loaded on demand. `stocks/` and `funds/` are git-ignored —
   bulky and reproducible; regenerated on deploy.
@@ -273,13 +276,16 @@ in `src/index.css`: one font, standardized sizes, the palette, sector colours,
 chart-mark rules) — use it exactly; never invent colours or fonts. The app is
 **tabbed**, path-based: `/` Overview (macro flows only, incl. a **sector-rotation
 heatmap**), `/stocks` the table, `/funds` the picker (topped by the **Trendsetters**
-strip), `/ideas` the idea lists (subtabs: Quiet accumulation · Buying & selling ·
+strip + a **Consensus** strip — what the biggest active funds commonly own & are
+adding), `/ideas` the idea lists (subtabs: Quiet accumulation · Buying & selling ·
 Battleground · Brand-new [recent IPOs hidden by default] · Turned around · Ownership
 & crowding · Follow the funds — the biggest-mover leaderboards live ONLY here), plus `/stock/<ISIN>` and
 `/fund/<key>` detail pages. The stock page's trend chart toggles **Total** (shares /
 value / implied price) vs **By fund** (a picked fund's own shares / % of portfolio),
 and carries an **Ownership over time** panel (fund-count trend + entry/exit
-timeline); the fund page carries an **Investing style** cap-mix fingerprint. Every
+timeline) and an **Added (6mo)** column (who's been accumulating over time, not just
+this month); the fund page carries an **Investing style** cap-mix trend (the mix
+month by month, coverage-aware). Every
 sparkline is clickable (chart + real numbers). Numbers use one format everywhere:
 crore/lakh and percents to 1 decimal, counts as integers, always a +/− sign and
 ▲/▼ on changes, "—" for unknown.

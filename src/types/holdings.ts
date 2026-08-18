@@ -271,6 +271,22 @@ export interface FundsIndex {
   entries: FundIndexEntry[];
   /** Funds that tend to buy a stock before the crowd piles in (coverage-guarded lead–lag). */
   trendsetters?: TrendsetterEntry[];
+  /** What the biggest active funds commonly own — the high-conviction consensus. */
+  consensus?: ConsensusEntry[];
+  /** How many top funds `consensus` was computed over (the "N" in "held by X of N"). */
+  consensusOf?: number;
+}
+
+/** A stock the biggest active funds commonly hold — the flip side of churn: shared conviction. */
+export interface ConsensusEntry {
+  isin: string;
+  name: string;
+  /** Macro sector (for the colour dot). */
+  sector: string | null;
+  /** How many of the top-N funds hold it in the latest month. */
+  heldBy: number;
+  /** How many of those have net-ADDED it over the last few months (still accumulating, not churning out). */
+  adding: number;
 }
 
 /** A fund that repeatedly entered a stock early, before many other funds followed. */

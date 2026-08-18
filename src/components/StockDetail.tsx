@@ -4,7 +4,7 @@ import { fundFileKey, loadStockDetail, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale } from "../lib/palette";
 import { DASH, formatCount, formatCountShort, formatInr, formatPercent, formatRupee, formatSignedCount } from "../lib/format";
-import { impliedPrice, monthDiff, detectSplit, entryExitCounts } from "../lib/signals";
+import { impliedPrice, monthDiff, detectSplit, entryExitCounts, recentAccumulation } from "../lib/signals";
 import { CapPill } from "./caps";
 import { LineChart, NetBars, EntryExitBars } from "./charts";
 import { TrendSpark } from "./Trend";
@@ -245,7 +245,9 @@ function OwnershipTrend({ detail }: { detail: StockDetail }) {
   );
 }
 
-type SortKey = "fund" | "shares" | "change";
+type SortKey = "fund" | "shares" | "change" | "added";
+/** Window for the "adding over a period of time" column — cuts through one-month churn. */
+const ADD_MONTHS = 6;
 
 function FundsTable({ funds, last, labels }: { funds: FundTrend[]; last: number; labels: string[] }) {
   const tt = useTooltip();
@@ -255,6 +257,7 @@ function FundsTable({ funds, last, labels }: { funds: FundTrend[]; last: number;
     const val = (f: FundTrend): number | string | null => {
       if (sort.key === "fund") return f.fundName.toLowerCase();
       if (sort.key === "shares") return f.shares[last];
+      if (sort.key === "added") return recentAccumulation(f.change, ADD_MONTHS);
       return f.change[last];
     };
     return [...funds].sort((a, b) => {
@@ -277,6 +280,7 @@ function FundsTable({ funds, last, labels }: { funds: FundTrend[]; last: number;
         <span className="th" onClick={() => click("fund")}>Fund <span className="arrow">{arrow("fund")}</span></span>
         <span className="th cell-r" style={{ justifySelf: "end" }} onClick={() => click("shares")}>Shares held <span className="arrow">{arrow("shares")}</span></span>
         <span className="th cell-r" style={{ justifySelf: "end" }} onClick={() => click("change")}>Change <span className="arrow">{arrow("change")}</span></span>
+        <span className="th cell-r" style={{ justifySelf: "end" }} onClick={() => click("added")} title="Net shares added over the last 6 months — who has been accumulating over time, not just this month">Added (6mo) <span className="arrow">{arrow("added")}</span></span>
         <span className="t-label" style={{ color: "var(--ink-2)" }}>Trend</span>
         <span className="t-label cell-r" style={{ color: "var(--ink-2)", justifySelf: "end" }}>% of fund</span>
         <span className="t-label" style={{ color: "var(--ink-2)" }}>Status</span>
@@ -348,6 +352,15 @@ function FundRow({ f, last, labels, tt }: { f: FundTrend; last: number; labels: 
       >
         {c == null ? DASH : <>{buy ? "▲" : sell ? "▼" : ""} {formatSignedCount(c)}</>}
       </div>
+      {(() => {
+        const added = recentAccumulation(f.change, ADD_MONTHS);
+        const ab = added != null && added > 0, as = added != null && added < 0;
+        return (
+          <div className="cell-r t-body num" style={{ color: added == null ? "var(--muted)" : ab ? "var(--buy)" : as ? "var(--sell)" : "var(--ink-2)" }}>
+            {added == null ? DASH : <>{ab ? "▲" : as ? "▼" : ""} {formatSignedCount(added)}</>}
+          </div>
+        );
+      })()}
       <TrendSpark values={f.shares} title={f.fundName} subtitle="Shares held in this stock, month by month" monthLabels={labels} />
       <div className="cell-r t-body num">{formatPercent(f.percent[last])}</div>
       <div><span className="badge" style={{ color: status.color, borderColor: status.color }}>{status.label}</span></div>

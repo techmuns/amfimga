@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FundDetail, FundHoldingTrend, FundsIndex, SummaryMeta, TrendsetterEntry } from "../types/holdings";
+import type { ConsensusEntry, FundDetail, FundHoldingTrend, FundsIndex, SummaryMeta, TrendsetterEntry } from "../types/holdings";
 import { loadFundDetail, loadFundsIndex, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
 import { DASH, formatCountShort, formatInr, formatPercent, formatSignedCount } from "../lib/format";
 import { CapPill } from "./caps";
+import { StackedBars } from "./charts";
 import { TrendSpark } from "./Trend";
 import { ThemeToggle } from "./ThemeToggle";
 import { useTooltip } from "./Tooltip";
@@ -108,6 +109,7 @@ export function FundsPage({ embedded }: { embedded?: boolean }) {
             Pick a scheme to see what it&apos;s buying and selling — or a whole fund house, rolled up. {state.index.monthLabel} · {state.index.entries.filter((e) => e.kind === "house").length} houses · {state.index.entries.filter((e) => e.kind === "fund").length} schemes.
           </div>
           <Trendsetters list={state.index.trendsetters ?? []} />
+          <ConsensusHoldings list={state.index.consensus ?? []} ofN={state.index.consensusOf ?? 0} />
           <FundPicker index={state.index} mode="page" />
         </>
       )}
@@ -137,6 +139,35 @@ function Trendsetters({ list }: { list: TrendsetterEntry[] }) {
               <div className="t-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Early on {t.examples.slice(0, 2).join(", ")}</div>
             )}
           </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Consensus strip: the stocks the biggest active funds commonly own, and how many
+ * of them are still adding — shared conviction, the flip side of one-month churn.
+ */
+function ConsensusHoldings({ list, ofN }: { list: ConsensusEntry[]; ofN: number }) {
+  if (!list || list.length === 0) return null;
+  return (
+    <section className="panel" style={{ padding: "16px 18px", marginBottom: 20 }}>
+      <div className="t-section">Consensus — what the big funds commonly own</div>
+      <div className="t-muted" style={{ margin: "2px 0 12px", maxWidth: 740 }}>
+        Stocks held by the most of the {ofN} largest active funds, and how many are still net-adding
+        (<span style={{ color: "var(--buy)" }}>▲</span> = funds still accumulating — sustained conviction, not a one-month churn in and out).
+        Broad agreement among the big players; a read on direction, not a recommendation.
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: "1px 20px" }}>
+        {list.map((c) => (
+          <div key={c.isin} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "7px 0", borderBottom: "1px solid var(--border)" }}>
+            <span className="link t-body" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.name} onClick={() => navigate(`/stock/${c.isin}`)}>{c.name}</span>
+            <span className="num t-muted" style={{ whiteSpace: "nowrap" }}>
+              <strong style={{ color: "var(--ink)" }}>{c.heldBy}</strong>/{ofN} hold
+              {c.adding > 0 && <span style={{ color: "var(--buy)", marginLeft: 8 }}>▲ {c.adding} adding</span>}
+            </span>
+          </div>
         ))}
       </div>
     </section>
@@ -368,7 +399,6 @@ function capMixAt(holdings: FundHoldingTrend[], t: number): { mix: Record<string
 
 /** A fund's/house's market-cap tilt (share of equity value) and how it has drifted since we first saw it. */
 function StyleFingerprint({ detail, last }: { detail: FundDetail; last: number }) {
-  const tt = useTooltip();
   const now = useMemo(() => capMixAt(detail.holdings, last), [detail, last]);
   const firstIdx = useMemo(() => {
     for (let t = 0; t < detail.months.length; t++) {
@@ -394,22 +424,16 @@ function StyleFingerprint({ detail, last }: { detail: FundDetail; last: number }
     else drift = `Cap mix steady since ${detail.monthLabels[firstIdx]}.`;
   }
 
+  const segs = CAP_ORDER.map((c) => ({ key: c, label: CAP_NAME[c], color: CAP_COLORS[c] }));
+  const series = detail.months.map((_, t) => capMixAt(detail.holdings, t).mix);
+
   return (
     <section style={{ marginTop: 30 }}>
       <div className="t-section">Investing style</div>
-      <div className="t-muted" style={{ margin: "2px 0 10px" }}>By market-cap band (share of equity value) · {detail.monthLabels[last]}</div>
-      <div style={{ display: "flex", height: 16, borderRadius: 5, overflow: "hidden", border: "1px solid var(--border)" }}>
-        {CAP_ORDER.map((cap) => {
-          const p = pct(cap, now);
-          if (p <= 0) return null;
-          return (
-            <div key={cap} style={{ width: `${p}%`, background: CAP_COLORS[cap] }}
-              onMouseEnter={(e) => tt.show(<div><div className="t-label">{CAP_NAME[cap]}</div><div style={{ marginTop: 3 }}>{p.toFixed(1)}%</div></div>, e.clientX, e.clientY)}
-              onMouseMove={(e) => tt.move(e.clientX, e.clientY)} onMouseLeave={tt.hide} />
-          );
-        })}
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 8 }}>
+      <div className="t-muted" style={{ margin: "2px 0 12px" }}>Market-cap mix (share of equity value) · month by month — read left→right to see the tilt drift</div>
+      <StackedBars labels={detail.monthLabels} present={detail.present} values={series} segs={segs} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 12 }}>
+        <span className="t-muted">Latest ({detail.monthLabels[last]}):</span>
         {CAP_ORDER.filter((c) => pct(c, now) > 0).map((cap) => (
           <span key={cap} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span className="sec-dot" style={{ background: CAP_COLORS[cap] }} />

@@ -39,6 +39,7 @@ import type {
   FundDetail,
   FundHoldingTrend,
   TrendsetterEntry,
+  ConsensusEntry,
 } from "../src/types/holdings.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -785,9 +786,50 @@ function main(): void {
     writeFileSync(resolve(DETAIL_DIR, `${d.isin}.json`), JSON.stringify(d)); // minified
   }
 
+  // ---- Conviction consensus: what the BIGGEST active funds commonly own ----
+  // The flip side of churn. Take the top-N active funds by latest equity value,
+  // then rank stocks by how many of them hold it this month — and how many are
+  // still net-ADDING it over the last few months (sustained conviction, not a
+  // one-month dip in and out). Coverage-aware: "adding" only counts a fund that
+  // was present at both ends of the window.
+  const CONSENSUS_N = 20;
+  const CONSENSUS_LOOKBACK = Math.min(3, L);
+  const topFundIds = fundIndex
+    .filter((e) => e.kind === "fund")
+    .sort((a, b) => (b.valueInr ?? 0) - (a.valueInr ?? 0))
+    .slice(0, CONSENSUS_N)
+    .map((e) => e.id);
+  const heldByTop = new Map<string, number>();
+  const addingTop = new Map<string, number>();
+  for (const fid of topFundIds) {
+    const mfL = idx[L].funds.get(fid);
+    if (!mfL) continue;
+    const past = CONSENSUS_LOOKBACK >= 1 ? idx[L - CONSENSUS_LOOKBACK].funds.get(fid) : undefined;
+    const pastComparable = CONSENSUS_LOOKBACK >= 1 && idx[L - CONSENSUS_LOOKBACK].funds.has(fid);
+    for (const [isin, h] of mfL.holds) {
+      if (h.shares == null || h.shares <= 0) continue; // must actually hold it now
+      heldByTop.set(isin, (heldByTop.get(isin) ?? 0) + 1);
+      if (pastComparable) {
+        const pastShares = past?.holds.get(isin)?.shares ?? 0; // present then, not holding = 0
+        if (pastShares != null && h.shares > pastShares) addingTop.set(isin, (addingTop.get(isin) ?? 0) + 1);
+      }
+    }
+  }
+  const consensus: ConsensusEntry[] = [...heldByTop.entries()]
+    .map(([isin, held]) => ({
+      isin,
+      name: nameOf.get(isin) ?? isin,
+      sector: macroOf(sectorOf.get(isin) ?? null),
+      heldBy: held,
+      adding: addingTop.get(isin) ?? 0,
+    }))
+    .sort((a, b) => b.heldBy - a.heldBy || b.adding - a.adding || a.name.localeCompare(b.name))
+    .slice(0, 15);
+
   const latestMeta = summary.months[summary.months.length - 1];
   const fundsIndexOut: FundsIndex = {
     schemaVersion: SCHEMA, month: latestMeta.month, monthLabel: latestMeta.label, entries: fundIndex, trendsetters,
+    consensus, consensusOf: topFundIds.length,
   };
   writeFileSync(resolve(OUT_DIR, "funds.json"), JSON.stringify(fundsIndexOut)); // minified — machine-loaded
   for (const f of fundDetails) {

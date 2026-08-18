@@ -304,6 +304,86 @@ export function EntryExitBars({ entered, exited, labels }: { entered: number[]; 
   );
 }
 
+export interface StackSeg { key: string; label: string; color: string }
+
+/**
+ * 100%-normalised stacked columns — one column per month, each split into its
+ * segments' shares. Reads left→right as a mix drifting over time (e.g. a fund's
+ * large/mid/small cap tilt). Months flagged absent (`present[t] === false`) or
+ * with no value render as a faint dashed gap, never as 0 (coverage-aware).
+ */
+export function StackedBars({
+  labels, present, values, segs, height = 132,
+}: {
+  labels: string[];
+  present: boolean[];
+  values: Record<string, number>[]; // per month: seg.key → absolute value
+  segs: StackSeg[];
+  height?: number;
+}) {
+  const tt = useTooltip();
+  const totals = values.map((m) => segs.reduce((a, s) => a + (m[s.key] || 0), 0));
+  const step = Math.max(1, Math.ceil(labels.length / 7));
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height }}>
+        {labels.map((_, i) => {
+          const total = totals[i];
+          const gap = present[i] === false || total <= 0;
+          return (
+            <div
+              key={i}
+              style={{ flex: 1, height: "100%", position: "relative" }}
+              onMouseEnter={(e) => tt.show(
+                <div>
+                  <div className="t-label">{labels[i]}</div>
+                  {gap ? (
+                    <div className="t-muted" style={{ marginTop: 3 }}>No data this month</div>
+                  ) : segs.map((s) => {
+                    const p = ((values[i][s.key] || 0) / total) * 100;
+                    return p > 0 ? (
+                      <div key={s.key} style={{ marginTop: 2 }}>
+                        <span className="sec-dot" style={{ background: s.color, marginRight: 6 }} />
+                        <span className="k">{s.label}: </span>{p.toFixed(1)}%
+                      </div>
+                    ) : null;
+                  })}
+                </div>, e.clientX, e.clientY,
+              )}
+              onMouseMove={(e) => tt.move(e.clientX, e.clientY)}
+              onMouseLeave={tt.hide}
+            >
+              {gap ? (
+                <div style={{ position: "absolute", inset: "0 15%", border: "1px dashed var(--grid)", borderRadius: 3 }} />
+              ) : (
+                (() => {
+                  let cum = 0;
+                  return segs.map((s) => {
+                    const p = ((values[i][s.key] || 0) / total) * 100;
+                    if (p <= 0) return null;
+                    const el = (
+                      <div key={s.key} style={{ position: "absolute", left: 0, right: 0, bottom: `${cum}%`, height: `${p}%`, background: s.color }} />
+                    );
+                    cum += p;
+                    return el;
+                  });
+                })()
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
+        {labels.map((l, i) => (
+          <div key={i} className="t-muted" style={{ flex: 1, textAlign: "center", fontSize: 11, overflow: "hidden" }}>
+            {i === 0 || i === labels.length - 1 || i % step === 0 ? `${l.slice(0, 3)} '${l.slice(-2)}` : ""}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Monthly net-change bars: green when funds net-bought, red when they net-sold. */
 export function NetBars({ values, labels }: { values: (number | null)[]; labels: string[] }) {
   const tt = useTooltip();
