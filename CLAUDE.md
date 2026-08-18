@@ -214,6 +214,11 @@ totals/flows) and clearly labelled.
 
 - Input: `data/aif-pms/<provider-slug>.json`, one per provider, filled from fact
   sheets (see `_template.json`). ISIN is the key; rows without an INE ISIN are dropped.
+- `scripts/parse-factsheet.ts` (`npm run factsheet -- <file.pdf|.txt> --provider "…"
+  --type PMS|AIF`) turns a fact sheet into that JSON. It reads a PDF (best-effort) or
+  a pasted holdings `.txt` (reliable), and resolves each holding's NAME → ISIN using
+  NSE's names + the MF stock names (fact sheets quote names, we key on ISIN — Rule 4).
+  Unresolved names are reported, never guessed; cash/total/other rows are skipped.
 - `scripts/derive-aif-pms.ts` (`npm run derive:aifpms`) reads those files, cross-
   references the MF `stocks.json`, and writes `public/data/aif-pms.json`: per stock,
   which providers disclose it, who **newly** disclosed it, and whether **no mutual
@@ -241,6 +246,7 @@ scripts/marketcap.ts       Reference: AMFI large/mid/small-cap list → data/mar
 scripts/listings.ts        Reference: NSE listing dates + official names → data/listings.json (input to derive)
 scripts/derive.ts          Derive: raw months → small summaries in public/data (drops passive/ETF; neutralises splits)
 scripts/derive-aif-pms.ts  Separate tier: AIF/PMS fact sheets → public/data/aif-pms.json (entry-only early signals)
+scripts/parse-factsheet.ts AIF/PMS fact sheet (PDF/text) → data/aif-pms/<slug>.json (name→ISIN resolver)
 .github/workflows/sync-amfibeas.yml  Monthly AMFIBEAS sync + derive (primary; no secrets)
 .github/workflows/ingest.yml  AdvisorKhoj ingest + derive (on-demand)
 data/months/               Raw month files (NOT served; input to derive)
@@ -283,6 +289,7 @@ npm run marketcap             # refresh AMFI cap list → data/marketcap.json (i
 npm run listings              # refresh NSE listing dates → data/listings.json (input to derive)
 npm run derive                # rebuild the browser summaries from data/months/
 npm run derive:aifpms         # rebuild AIF/PMS early signals from data/aif-pms/ (dormant until fact sheets added)
+npm run factsheet -- <file> --provider "Name" --type PMS   # parse a fact sheet (PDF/.txt) → data/aif-pms/<slug>.json
 npm run data                  # ingest --latest, then marketcap, listings, derive, derive:aifpms
 ```
 
