@@ -8,15 +8,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy": "npm run derive && npm run build && wrangler deploy",
+    "deploy": "npm run derive && npm run derive:aifpms && npm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "ingest": "tsx scripts/ingest.ts",
     "ingest:amfibeas": "tsx scripts/ingest-amfibeas.ts",
     "marketcap": "tsx scripts/marketcap.ts",
     "listings": "tsx scripts/listings.ts",
     "derive": "tsx scripts/derive.ts",
-    "data": "npm run ingest -- --latest && npm run marketcap && npm run listings && npm run derive",
-    "data:amfibeas": "npm run ingest:amfibeas && npm run marketcap && npm run listings && npm run derive"
+    "derive:aifpms": "tsx scripts/derive-aif-pms.ts",
+    "data": "npm run ingest -- --latest && npm run marketcap && npm run listings && npm run derive && npm run derive:aifpms",
+    "data:amfibeas": "npm run ingest:amfibeas && npm run marketcap && npm run listings && npm run derive && npm run derive:aifpms"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

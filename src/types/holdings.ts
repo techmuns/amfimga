@@ -338,6 +338,49 @@ export interface FundDetail {
   sectorAllocation: { sector: string; valueInr: number }[];
 }
 
+// ===========================================================================
+// AIF / PMS early signals (a SEPARATE, complementary tier)
+//
+// AIFs and PMSes don't publish machine-readable full holdings like mutual funds
+// do — they disclose via monthly/quarterly fact sheets, and most show only their
+// TOP-10 holdings. So this data is PARTIAL by nature, and the one rule that makes
+// it honest: it is ENTRY/PRESENCE-only. A name dropping out of a top-10 is NOT a
+// sell (it may just have slipped below #10), so we never compute a sell, an exit
+// or a month-over-month change from it — only "a new name appeared in an AIF/PMS's
+// disclosures", the early signal. It is kept entirely separate from the mutual-
+// fund aggregates (never mixed into stock totals/flows) and clearly labelled.
+// Produced by scripts/derive-aif-pms.ts from data/aif-pms/<slug>.json fact sheets.
+// ===========================================================================
+
+/** `public/data/aif-pms.json` — AIF/PMS early-entry signals (only present when fact sheets are loaded). */
+export interface AifPmsSummary {
+  schemaVersion: number;
+  generatedAt: string;
+  /** Latest disclosed month across all providers, "YYYY-MM". */
+  month: string;
+  monthLabel: string;
+  /** Providers with any disclosure loaded. */
+  providers: { slug: string; name: string; type: "AIF" | "PMS" }[];
+  entries: AifPmsEntry[];
+}
+
+/** One stock currently disclosed by ≥1 AIF/PMS provider. */
+export interface AifPmsEntry {
+  isin: string;
+  name: string;
+  /** Macro sector (from the MF data when the stock is known there), else null. */
+  sector: string | null;
+  marketCap: MarketCap | null;
+  /** Providers currently disclosing it (in their latest fact sheet). */
+  heldBy: { name: string; type: "AIF" | "PMS" }[];
+  /** Providers that NEWLY disclosed it this period (absent from their prior fact sheet) — the early signal. */
+  newlyDisclosed: { name: string; type: "AIF" | "PMS" }[];
+  /** True when NO mutual fund in our MF data holds it — an AIF/PMS ahead of the crowd. */
+  aheadOfMutualFunds: boolean;
+  /** How many mutual funds hold it (from the MF data), for context. `null` = none/unknown. */
+  mfFundCount: number | null;
+}
+
 export interface FundHoldingTrend {
   isin: string;
   name: string;

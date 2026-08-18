@@ -6,6 +6,7 @@ import { makeSectorScale, type SectorScale } from "../lib/palette";
 import { DASH, formatRupee, formatSignedCount } from "../lib/format";
 import { buyStreak, battleground, impliedPrice, monthDiff } from "../lib/signals";
 import { CapFilter, CapPill, capPass } from "./caps";
+import { AifPmsPanel } from "./AifPmsPanel";
 import { LineChart } from "./charts";
 import { TrendSpark } from "./Trend";
 import { ThemeToggle } from "./ThemeToggle";
@@ -34,7 +35,8 @@ export function IdeasPage({ embedded }: { embedded?: boolean }) {
         </div>
       )}
       <h1 className="t-page">Ideas</h1>
-      <div className="t-muted" style={{ marginTop: 3 }}>Where the opportunities are hiding this month — each list is sortable; click a stock for detail.</div>
+      <div className="t-muted" style={{ marginTop: 3, marginBottom: 18 }}>Where the opportunities are hiding this month — each list is sortable; click a stock for detail.</div>
+      <AifPmsPanel />
       {state.status === "loading" && <p className="t-muted" style={{ marginTop: 20 }}>Loading…</p>}
       {state.status === "error" && <p className="t-body" style={{ marginTop: 20, color: "var(--sell)" }}>Couldn&apos;t load data: {state.reason}</p>}
       {state.status === "ready" && <Ideas summary={state.summary} stocks={state.stocks} />}

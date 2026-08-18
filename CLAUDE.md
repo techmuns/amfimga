@@ -197,6 +197,31 @@ established company mutual funds are buying for the FIRST time stands out. Age i
 `null`/unknown when the stock isn't on NSE's list (BSE-only, delisted) — never
 guessed, and such names are never wrongly labelled recent or established.
 
+`listings.json` also carries NSE's official **company names** by ISIN, which derive
+prefers as the display label — so source noise like "EQ - SWIGGY LTD" reads
+"Swiggy Limited" and an ISIN-only row gets a real name. Display only; ISIN stays
+the join key (Rule 4).
+
+## AIF / PMS early signals (a separate, complementary tier)
+
+AIFs and PMSes don't publish machine-readable full holdings — they disclose via
+monthly/quarterly **fact sheets, usually only their top-10 holdings**. So this data
+is PARTIAL, and the rule that keeps it honest is **entry-only**: a name appearing is
+a signal; a name *leaving* a top-10 is NEVER a sell (it may just have slipped below
+#10), so we never compute a sell, exit, or month-over-month change from it. It is
+kept entirely **separate from the mutual-fund aggregates** (never mixed into stock
+totals/flows) and clearly labelled.
+
+- Input: `data/aif-pms/<provider-slug>.json`, one per provider, filled from fact
+  sheets (see `_template.json`). ISIN is the key; rows without an INE ISIN are dropped.
+- `scripts/derive-aif-pms.ts` (`npm run derive:aifpms`) reads those files, cross-
+  references the MF `stocks.json`, and writes `public/data/aif-pms.json`: per stock,
+  which providers disclose it, who **newly** disclosed it, and whether **no mutual
+  fund holds it yet** (`aheadOfMutualFunds` — the strongest early signal).
+- UI: an "AIF & PMS — early signals" panel atop `/ideas` (`AifPmsPanel`). It renders
+  **nothing** until fact sheets are loaded — no empty/fake section on the live site
+  (Rule 2/5). Needs the client's fact-sheet data to go live.
+
 ## Tech stack
 
 - **React 19 + TypeScript + Tailwind CSS v4**, built with **Vite**.
@@ -213,12 +238,14 @@ worker/index.ts            Cloudflare Worker: static-asset pass-through (no auth
 scripts/ingest-amfibeas.ts Primary source: import AMFIBEAS holdings (all ~50 houses) → data/months/…
 scripts/ingest.ts          AdvisorKhoj scraper (on-demand): download + parse → data/months/<YYYY-MM>.json.gz
 scripts/marketcap.ts       Reference: AMFI large/mid/small-cap list → data/marketcap.json (input to derive)
-scripts/listings.ts        Reference: NSE listing dates (IPO-vs-established) → data/listings.json (input to derive)
+scripts/listings.ts        Reference: NSE listing dates + official names → data/listings.json (input to derive)
 scripts/derive.ts          Derive: raw months → small summaries in public/data (drops passive/ETF; neutralises splits)
+scripts/derive-aif-pms.ts  Separate tier: AIF/PMS fact sheets → public/data/aif-pms.json (entry-only early signals)
 .github/workflows/sync-amfibeas.yml  Monthly AMFIBEAS sync + derive (primary; no secrets)
 .github/workflows/ingest.yml  AdvisorKhoj ingest + derive (on-demand)
 data/months/               Raw month files (NOT served; input to derive)
   <YYYY-MM>.json.gz        One month, all fund houses (gzipped; produced by ingestion)
+data/aif-pms/              AIF/PMS fact-sheet inputs (one JSON per provider; _template.json documents the format)
 src/
   main.tsx                 React entry
   App.tsx                  Home page + client routing: top net buys/sells + coverage
@@ -234,7 +261,8 @@ public/
     summary.json           Months + coverage counts
     stocks.json            Compact all-stocks table
     sectors.json           Net share-change by sector
-    funds.json             Fund/house picker index
+    funds.json             Fund/house picker index (+ trendsetters, consensus)
+    aif-pms.json           AIF/PMS early signals (only present when fact sheets are loaded)
     stocks/<ISIN>.json     Per-stock detail (git-ignored; regenerated on deploy)
     funds/<key>.json       Per-fund & per-house detail (git-ignored; regenerated on deploy)
 docs/data-format.md        On-disk data format, in prose
@@ -254,7 +282,8 @@ npm run ingest -- --latest    # AdvisorKhoj scraper (on-demand): latest full mon
 npm run marketcap             # refresh AMFI cap list → data/marketcap.json (input to derive)
 npm run listings              # refresh NSE listing dates → data/listings.json (input to derive)
 npm run derive                # rebuild the browser summaries from data/months/
-npm run data                  # ingest --latest, then marketcap, listings, derive
+npm run derive:aifpms         # rebuild AIF/PMS early signals from data/aif-pms/ (dormant until fact sheets added)
+npm run data                  # ingest --latest, then marketcap, listings, derive, derive:aifpms
 ```
 
 ## Ingestion secrets
@@ -277,7 +306,8 @@ chart-mark rules) — use it exactly; never invent colours or fonts. The app is
 **tabbed**, path-based: `/` Overview (macro flows only, incl. a **sector-rotation
 heatmap**), `/stocks` the table, `/funds` the picker (topped by the **Trendsetters**
 strip + a **Consensus** strip — what the biggest active funds commonly own & are
-adding), `/ideas` the idea lists (subtabs: Quiet accumulation · Buying & selling ·
+adding), `/ideas` the idea lists (topped by an **AIF/PMS early-signals** panel when
+fact sheets are loaded; subtabs: Quiet accumulation · Buying & selling ·
 Battleground · Brand-new [recent IPOs hidden by default] · Turned around · Ownership
 & crowding · Follow the funds — the biggest-mover leaderboards live ONLY here), plus `/stock/<ISIN>` and
 `/fund/<key>` detail pages. The stock page's trend chart toggles **Total** (shares /

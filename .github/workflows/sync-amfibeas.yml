@@ -57,6 +57,9 @@ jobs:
       - name: Derive browser summaries
         run: npm run derive
 
+      - name: Derive AIF/PMS early signals (dormant until fact sheets are added)
+        run: npm run derive:aifpms
+
       - name: Commit derived summaries
         run: |
           # Raw months are committed during import (--commit). Here we commit the

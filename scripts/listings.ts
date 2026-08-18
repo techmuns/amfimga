@@ -87,9 +87,11 @@ async function main() {
   const header = (rows[0] || []).map(norm);
   const isinCol = header.findIndex((c) => c.includes("isin"));
   const dateCol = header.findIndex((c) => c.includes("date of listing"));
+  const nameCol = header.findIndex((c) => c.includes("name of company"));
   if (isinCol < 0 || dateCol < 0) throw new Error("Could not find ISIN / DATE OF LISTING columns");
 
   const listings: Record<string, string> = {};
+  const names: Record<string, string> = {}; // ISIN → NSE's official company name (clean display label, Rule 4)
   let seen = 0;
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] || [];
@@ -100,6 +102,10 @@ async function main() {
     seen++;
     // A company has one ISIN across series (EQ/BE/SME); keep the EARLIEST listing date.
     if (!listings[isin] || iso < listings[isin]) listings[isin] = iso;
+    if (nameCol >= 0 && !names[isin]) {
+      const nm = String(row[nameCol] ?? "").replace(/\s+/g, " ").trim();
+      if (nm) names[isin] = nm;
+    }
   }
   if (Object.keys(listings).length === 0) throw new Error("Parsed 0 listing dates — format changed?");
 
@@ -107,12 +113,12 @@ async function main() {
   writeFileSync(
     OUT,
     JSON.stringify(
-      { source: "NSE — EQUITY_L (list of equities)", url: URL, generatedAt: new Date().toISOString(), count: Object.keys(listings).length, listings },
+      { source: "NSE — EQUITY_L (list of equities)", url: URL, generatedAt: new Date().toISOString(), count: Object.keys(listings).length, listings, names },
       null,
       0,
     ) + "\n",
   );
-  console.log(`Wrote ${OUT}: ${Object.keys(listings).length} ISIN → listing-date entries (from ${seen} rows).`);
+  console.log(`Wrote ${OUT}: ${Object.keys(listings).length} listing dates + ${Object.keys(names).length} names (from ${seen} rows).`);
 }
 
 function configureProxy(): void {

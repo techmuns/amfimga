@@ -1,0 +1,30 @@
+{
+  "_readme": [
+    "AIF / PMS holdings, one file per provider. Copy this to <provider-slug>.json",
+    "(e.g. marcellus-ccp.json) and fill it from the provider's monthly/quarterly",
+    "fact sheet. Files whose name starts with '_' are ignored (this template).",
+    "",
+    "Only ISIN + a label is required per holding; percent/value/shares are optional",
+    "(fact sheets usually give % of portfolio). ISIN is the join key (Rule 4): use",
+    "the real INE... ISIN, never the name, as the key. Rows without a valid INE ISIN",
+    "are dropped.",
+    "",
+    "'disclosure': 'partial' means only the top holdings are shown (the norm for",
+    "AIF/PMS). We treat this data as ENTRY-ONLY — a name leaving the list is NEVER",
+    "read as a sell. List each month you have a fact sheet for; months can be",
+    "monthly or quarterly, whatever the provider publishes."
+  ],
+  "name": "Example Capital — Flagship PMS",
+  "type": "PMS",
+  "disclosure": "partial",
+  "months": {
+    "2026-06": [
+      { "isin": "INE040A01034", "name": "HDFC Bank", "percent": 9.8 },
+      { "isin": "INE009A01021", "name": "Infosys", "percent": 7.1 }
+    ],
+    "2026-07": [
+      { "isin": "INE040A01034", "name": "HDFC Bank", "percent": 9.5 },
+      { "isin": "INE669E01016", "name": "Idea/other new name", "percent": 4.2 }
+    ]
+  }
+}

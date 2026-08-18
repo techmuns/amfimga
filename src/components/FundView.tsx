@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ConsensusEntry, FundDetail, FundHoldingTrend, FundsIndex, SummaryMeta, TrendsetterEntry } from "../types/holdings";
-import { loadFundDetail, loadFundsIndex, loadSummary } from "../lib/data";
+import { fundFileKey, loadFundDetail, loadFundsIndex, loadSummary } from "../lib/data";
 import { navigate } from "../lib/router";
 import { makeSectorScale, type SectorScale } from "../lib/palette";
 import { DASH, formatCountShort, formatInr, formatPercent, formatSignedCount } from "../lib/format";
@@ -229,7 +229,14 @@ function Detail({ summary, index, detail }: { summary: SummaryMeta; index: Funds
         <span className="badge" style={{ color: "var(--ink-2)" }}>{detail.kind === "house" ? "Fund house" : "Scheme"}</span>
       </div>
       <div className="t-muted" style={{ marginTop: 2 }}>
-        {detail.kind === "fund" ? <>{detail.house} · </> : null}{detail.monthLabels[last]}
+        {detail.kind === "fund" ? (
+          <>Scheme of{" "}
+            <button className="link" onClick={() => navigate(`/fund/${fundFileKey("house", detail.amcSlug)}`)}>{detail.house}</button>
+            {" · "}{detail.monthLabels[last]}
+          </>
+        ) : (
+          <>Whole fund house — all its schemes rolled up · {detail.monthLabels[last]}</>
+        )}
       </div>
 
       {/* Inline summary line — no stat cards */}

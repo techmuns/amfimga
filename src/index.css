@@ -103,6 +103,14 @@
     column-gap: 12px;
   }
 
+  /* AIF/PMS early-signals table: Stock · Disclosed by · Signal · Mutual funds. */
+  .aif-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 2fr) minmax(130px, 1fr) 116px 132px;
+    align-items: center;
+    column-gap: 12px;
+  }
+
   /* Holdings table on the per-fund page: Stock · Sector · Shares · % · Change · Trend. */
   .hold-grid {
     display: grid;

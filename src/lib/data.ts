@@ -5,6 +5,7 @@ import type {
   SectorSummary,
   FundsIndex,
   FundDetail,
+  AifPmsSummary,
 } from "../types/holdings";
 
 /**
@@ -48,3 +49,16 @@ export const loadFundDetail = (file: string): Promise<FundDetail> =>
 /** URL-/file-safe key for a fund or house detail. MUST match `fundFileKey` in scripts/derive.ts. */
 export const fundFileKey = (kind: "fund" | "house", id: string): string =>
   `${kind}__${id}`.replace(/[^A-Za-z0-9._-]/g, "_");
+
+/**
+ * AIF/PMS early signals — a SEPARATE, complementary layer. Returns `null` when the
+ * file is absent (no fact sheets loaded yet), so the UI section simply stays hidden
+ * rather than showing empty/fake data.
+ */
+export const loadAifPms = async (): Promise<AifPmsSummary | null> => {
+  try {
+    return await getJson<AifPmsSummary>("/data/aif-pms.json", "AIF/PMS signals");
+  } catch {
+    return null;
+  }
+};

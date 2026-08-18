@@ -133,6 +133,20 @@ function loadListings(): Record<string, string> {
     return {};
   }
 }
+/** ISIN → NSE's official company name — the clean, canonical display label (#7). */
+function loadListingNames(): Record<string, string> {
+  const p = resolve(ROOT, "data/listings.json");
+  if (!existsSync(p)) return {};
+  try {
+    return (JSON.parse(readFileSync(p, "utf8")) as { names?: Record<string, string> }).names ?? {};
+  } catch {
+    return {};
+  }
+}
+/** Tidy a fund-source stock name for display: drop the "EQ - " / "BE - " exchange-series prefix. */
+function cleanName(s: string): string {
+  return s.replace(/^(EQ|BE|BZ|SM|ST|IQ)\s*[-–]\s*/i, "").replace(/\s+/g, " ").trim();
+}
 /** Whole months between a "YYYY-MM-DD" listing date and a "YYYY-MM" reference month; null if unparseable. */
 function monthsSince(listedOn: string | undefined, refMonth: string): number | null {
   if (!listedOn) return null;
@@ -345,6 +359,7 @@ function main(): void {
   const idx = months.map((m) => indexMonth(m.data));
   const caps = loadCaps();
   const listings = loadListings();
+  const listingNames = loadListingNames();
   let capMatched = 0;
   let listedMatched = 0;
 
@@ -358,11 +373,19 @@ function main(): void {
     for (const mf of idx[t].funds.values()) {
       for (const [isin, h] of mf.holds) {
         isins.add(isin);
-        if (h.name) nameOf.set(isin, h.name); // latest wins
+        if (h.name) nameOf.set(isin, cleanName(h.name)); // latest wins (tidied)
         if (h.sector) sectorOf.set(isin, h.sector);
         else if (!sectorOf.has(isin)) sectorOf.set(isin, null);
       }
     }
+  }
+  // Prefer NSE's official company name for display where we have it — clean and
+  // canonical, so "EQ - SWIGGY LTD" reads "Swiggy Limited" and ISIN-only names get
+  // a real label (#7). ISIN stays the join key everywhere (Rule 4).
+  let nseNamed = 0;
+  for (const isin of isins) {
+    const nse = listingNames[isin];
+    if (nse) { nameOf.set(isin, nse); nseNamed++; }
   }
 
   const stocks: StockRow[] = [];
