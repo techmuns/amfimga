@@ -102,6 +102,45 @@ function loadCaps(): Record<string, Cap> {
   }
 }
 
+// --- Part C: passive / index / ETF funds — EXCLUDED from every aggregate (#2) ---
+// Index funds and ETFs mechanically mirror whatever their benchmark holds, so
+// their "buying" is not an active-conviction signal — including them just adds
+// noise (every large cap looks universally owned, every rebalance looks like a
+// flow). We drop them from all derived numbers: stock totals, month-over-month
+// flows, fund counts, sector flows and trendsetters. A house still counts as
+// "present" for coverage if it disclosed anything (active OR passive), so the
+// "X of Y houses" headline is unaffected.
+//
+// Calibrated against the live fund list: this catches the ~470 index/ETF schemes
+// with no false positives. It deliberately does NOT match actively-managed
+// "... Active Momentum" funds, nor "... Liquid" (money-market/debt) funds.
+const PASSIVE_NAME = /\b(ETF|EXCHANGE[\s-]?TRADED|INDEX|BEES|NIFTY|SENSEX|BSE\s*\d)\b/i;
+function isPassiveFund(name: string): boolean {
+  return PASSIVE_NAME.test(name);
+}
+
+// --- Part D: stock listing dates (ISIN → "YYYY-MM-DD"), produced by scripts/listings.ts ---
+// Used to tell a genuine "old company, newly bought" from a brand-new IPO in the
+// "Brand-new entries" idea list (#1). Missing = age unknown (never guessed).
+const IPO_RECENT_MONTHS = 12; // listed within a year of the latest data month ⇒ "recent IPO"
+function loadListings(): Record<string, string> {
+  const p = resolve(ROOT, "data/listings.json");
+  if (!existsSync(p)) return {};
+  try {
+    return (JSON.parse(readFileSync(p, "utf8")) as { listings?: Record<string, string> }).listings ?? {};
+  } catch {
+    return {};
+  }
+}
+/** Whole months between a "YYYY-MM-DD" listing date and a "YYYY-MM" reference month; null if unparseable. */
+function monthsSince(listedOn: string | undefined, refMonth: string): number | null {
+  if (!listedOn) return null;
+  const m = listedOn.match(/^(\d{4})-(\d{2})/);
+  if (!m) return null;
+  const [ry, rm] = refMonth.split("-").map(Number);
+  return (ry - Number(m[1])) * 12 + (rm - Number(m[2]));
+}
+
 /** A stock position as seen in one fund in one month. */
 interface Held {
   shares: number | null;
@@ -119,10 +158,11 @@ interface MonthFund {
 }
 /** Everything we index for one month. */
 interface MonthIndex {
-  funds: Map<string, MonthFund>; // fundId → fund
+  funds: Map<string, MonthFund>; // fundId → fund (ACTIVE funds only; passive excluded)
   houses: Set<string>; // amcSlugs present (have data)
   holders: Map<string, string[]>; // isin → fundIds holding it
   housesTotal: number; // houses AdvisorKhoj listed (attempted)
+  passive: number; // index/ETF schemes dropped this month (for logging)
 }
 
 /** Add two possibly-null numbers, treating null as "nothing to add" (not 0). */
@@ -192,9 +232,11 @@ function indexMonth(data: MonthData): MonthIndex {
   const keyOf = (f: FundHoldings): string =>
     (namesById.get(f.fundId)?.size ?? 0) > 1 ? `${f.fundId}::${normName(f.fundName)}` : f.fundId;
 
+  let passive = 0;
   for (const f of data.funds) {
     const amcSlug = amcSlugOf(f.fundId);
-    houses.add(amcSlug);
+    houses.add(amcSlug); // a house counts as present if it disclosed anything (active OR passive)
+    if (isPassiveFund(f.fundName)) { passive++; continue; } // #2: index/ETF add no active signal — drop
     const fundKey = keyOf(f);
     let mf = funds.get(fundKey);
     if (!mf) {
@@ -222,27 +264,27 @@ function indexMonth(data: MonthData): MonthIndex {
     }
   }
   const housesTotal = data.coverage?.length ?? houses.size;
-  return { funds, houses, holders, housesTotal };
-}
-
-/** Shares of one fund's position in one month. Assumes the house is present. */
-function sharesOf(mi: MonthIndex, fundId: string, isin: string): number | null {
-  const held = mi.funds.get(fundId)?.holds.get(isin);
-  // House present but this fund doesn't hold it → a genuine zero (Rule 2 ok).
-  if (!held) return 0;
-  return held.shares; // may be null (held but share count undisclosed)
+  return { funds, houses, holders, housesTotal, passive };
 }
 
 interface Flow {
   net: number | null; // coverage-aware net share change
   buying: number | null; // funds that added (incl. new positions)
   selling: number | null; // funds that trimmed (incl. exits)
+  /** Set when the month's share jump is a bonus/split, not fund buying: the rough ratio (~2 for a 1:1 bonus). */
+  action?: number;
 }
 
 /**
  * Coverage-aware flow for one stock between month t-1 and t. Only funds whose
  * house is present in BOTH months count. All null when there is no prior month
  * or nothing comparable is known.
+ *
+ * Bonus/split guard (#3): if the continuing holders' shares jumped sharply while
+ * their combined market value stayed ~flat, the change is a corporate action, not
+ * a trade. We report the whole month as unknown (net/buying/selling = null) and
+ * flag the ratio — so a split never masquerades as buying in the totals, the
+ * buy/sell streaks, the sector flows or the Overview.
  */
 function flowDetail(prev: MonthIndex, cur: MonthIndex, isin: string): Flow {
   const comparable = new Set([...cur.houses].filter((h) => prev.houses.has(h)));
@@ -256,21 +298,39 @@ function flowDetail(prev: MonthIndex, cur: MonthIndex, isin: string): Flow {
   let known = false;
   let buying = 0;
   let selling = 0;
+  // For split detection: sum shares & value of funds that held in BOTH months.
+  let sPrev = 0, sCur = 0, vPrev = 0, vCur = 0, bothHeld = 0;
   for (const id of fundIds) {
-    const sPrev = sharesOf(prev, id, isin);
-    const sCur = sharesOf(cur, id, isin);
-    if (sPrev == null || sCur == null) continue; // undisclosed shares → unknown
-    const d = sCur - sPrev;
+    // House is comparable (present both months), so a fund not holding it = a real 0.
+    const hp = prev.funds.get(id)?.holds.get(isin);
+    const hc = cur.funds.get(id)?.holds.get(isin);
+    const sp = hp ? hp.shares : 0;
+    const sc = hc ? hc.shares : 0;
+    if (sp == null || sc == null) continue; // undisclosed shares → unknown
+    const d = sc - sp;
     net += d;
     known = true;
     if (d > 0) buying++;
     else if (d < 0) selling++;
+    if (sp > 0 && sc > 0) {
+      sPrev += sp; sCur += sc; bothHeld++;
+      if (hp?.value != null) vPrev += hp.value;
+      if (hc?.value != null) vCur += hc.value;
+    }
   }
-  return known ? { net, buying, selling } : { net: null, buying: null, selling: null };
-}
+  if (!known) return { net: null, buying: null, selling: null };
 
-const netChange = (prev: MonthIndex, cur: MonthIndex, isin: string): number | null =>
-  flowDetail(prev, cur, isin).net;
+  // Split/bonus: shares up ≥1.7× while combined market value held ~flat (a split
+  // scales price down as it scales shares up, so value barely moves). Real buying
+  // would lift value too, so this won't fire on genuine flow.
+  if (bothHeld > 0 && sPrev > 0 && sCur / sPrev >= 1.7 && vPrev > 0 && vCur > 0) {
+    const vr = vCur / vPrev;
+    if (vr >= 0.7 && vr <= 1.4) {
+      return { net: null, buying: null, selling: null, action: Math.round((sCur / sPrev) * 10) / 10 };
+    }
+  }
+  return { net, buying, selling };
+}
 
 function main(): void {
   const months = loadMonths();
@@ -283,7 +343,9 @@ function main(): void {
   const T = months.length;
   const idx = months.map((m) => indexMonth(m.data));
   const caps = loadCaps();
+  const listings = loadListings();
   let capMatched = 0;
+  let listedMatched = 0;
 
   console.log(`Deriving from ${T} months: ${monthKeys.join(", ")}`);
 
@@ -306,6 +368,8 @@ function main(): void {
   const details: StockDetail[] = [];
   // sector → per-month running totals (null until a known value lands).
   const sectorTotals = new Map<string, (number | null)[]>();
+  // isin → months where a bonus/split was detected (so per-fund change is nulled there too).
+  const splitMonths = new Map<string, Set<number>>();
 
   // Latest transition: which houses entered / left the data (for the coverage hover).
   const houseName = new Map<string, string>();
@@ -325,10 +389,19 @@ function main(): void {
     const marketCap = caps[isin] ?? null;
     if (marketCap) capMatched++;
 
+    // Listing age (#1): recent-IPO vs long-established, or unknown when unlisted on NSE.
+    const listedOn = listings[isin] ?? null;
+    if (listedOn) listedMatched++;
+    const ageMonths = monthsSince(listings[isin], monthKeys[L]);
+    const recentIpo = ageMonths == null ? undefined : ageMonths < IPO_RECENT_MONTHS;
+
     const totalShares: (number | null)[] = [];
     const totalValueInr: (number | null)[] = [];
     const fundCount: (number | null)[] = [];
     const nsc: (number | null)[] = [];
+    const splitSet = new Set<number>(); // months this stock had a bonus/split
+    const corporateActions: { index: number; ratio: number }[] = [];
+    let flow: Flow = { net: null, buying: null, selling: null }; // latest-month flow (set in the loop)
 
     for (let t = 0; t < T; t++) {
       const holderIds = idx[t].holders.get(isin) ?? [];
@@ -348,8 +421,16 @@ function main(): void {
         totalValueInr.push(v);
         fundCount.push(holderIds.length);
       }
-      nsc.push(t === 0 ? null : netChange(idx[t - 1], idx[t], isin));
+      if (t === 0) {
+        nsc.push(null);
+      } else {
+        const f = flowDetail(idx[t - 1], idx[t], isin);
+        nsc.push(f.net);
+        if (f.action) { splitSet.add(t); corporateActions.push({ index: t, ratio: f.action }); }
+        if (t === L) flow = f;
+      }
     }
+    if (splitSet.size) splitMonths.set(isin, splitSet);
 
     // Coverage note: entered/left houses that actually hold this stock.
     let coverageAffected: StockRow["coverageAffected"];
@@ -373,8 +454,8 @@ function main(): void {
       }
     }
 
-    // This month's flow detail (funds adding vs trimming), coverage-aware.
-    const flow = L >= 1 ? flowDetail(idx[L - 1], idx[L], isin) : { net: null, buying: null, selling: null };
+    // This month's flow detail (funds adding vs trimming) was captured as `flow`
+    // in the loop above — already coverage-aware and split-neutralised.
 
     // Brand-new to funds this month: never held in any earlier month, and held
     // now by a house that was ALSO present last month (so it's a real new entry,
@@ -412,6 +493,7 @@ function main(): void {
       isin, name, sector, macroSector, marketCap,
       totalShares, totalValueInr, fundCount, netShareChange: nsc, coverageAffected,
       fundsBuying: flow.buying, fundsSelling: flow.selling, newEntry, topHolder,
+      listedOn, recentIpo,
     });
 
     // Fund-by-fund detail.
@@ -444,7 +526,8 @@ function main(): void {
           change.push(null);
           event.push(null);
         } else {
-          change.push(s - sp);
+          // A bonus/split month's jump is a corporate action, not a trade → change unknown.
+          change.push(splitSet.has(t) ? null : s - sp);
           event.push(sp === 0 && s > 0 ? "new" : sp > 0 && s === 0 ? "exit" : null);
         }
       }
@@ -457,6 +540,7 @@ function main(): void {
       schemaVersion: SCHEMA, isin, name, sector, macroSector, marketCap,
       months: monthKeys, monthLabels: labels,
       totalShares, totalValueInr, fundCount, netShareChange: nsc, funds,
+      listedOn, corporateActions: corporateActions.length ? corporateActions : undefined,
     });
 
     // Sector roll-up by MACRO sector (skip stocks with no sector — never invent one).
@@ -542,7 +626,8 @@ function main(): void {
         if (t === 0 || !present[t] || !present[t - 1] || s == null || sp == null) {
           change.push(null); event.push(null);
         } else {
-          change.push(s - sp);
+          // Bonus/split month → the jump isn't a trade (#3).
+          change.push(splitMonths.get(isin)?.has(t) ? null : s - sp);
           event.push(sp === 0 && s > 0 ? "new" : sp > 0 && s === 0 ? "exit" : null);
         }
       }
@@ -718,8 +803,17 @@ function main(): void {
     `Market cap: ${capMatched}/${stocks.length} stocks tagged (${((100 * capMatched) / stocks.length).toFixed(1)}%)` +
       (Object.keys(caps).length === 0 ? " — no data/marketcap.json (run `npm run marketcap`)" : ""),
   );
-  for (const m of summary.months) {
-    console.log(`  ${m.label}: ${m.housesPresent}/${m.housesTotal} houses, ${m.fundCount} funds, ${m.stockCount} stocks`);
+  const recentCount = stocks.filter((s) => s.recentIpo === true).length;
+  console.log(
+    `Listing dates: ${listedMatched}/${stocks.length} stocks matched (${((100 * listedMatched) / stocks.length).toFixed(1)}%)` +
+      `, ${recentCount} tagged recent-IPO (< ${IPO_RECENT_MONTHS} mo)` +
+      (Object.keys(listings).length === 0 ? " — no data/listings.json (run `npm run listings`)" : ""),
+  );
+  const totalPassive = idx.reduce((a, mi) => a + mi.passive, 0);
+  console.log(`Passive/index/ETF schemes excluded (#2): ${totalPassive} across ${T} months (${idx[L].passive} in the latest).`);
+  for (let t = 0; t < T; t++) {
+    const m = summary.months[t];
+    console.log(`  ${m.label}: ${m.housesPresent}/${m.housesTotal} houses, ${m.fundCount} active funds (${idx[t].passive} passive excl.), ${m.stockCount} stocks`);
   }
 }
 

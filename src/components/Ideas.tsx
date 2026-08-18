@@ -49,11 +49,20 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
   const [capSel, setCapSel] = useState<Set<MarketCap>>(new Set());
   const toggleCap = (c: MarketCap) =>
     setCapSel((prev) => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; });
+  // "Brand-new entries" defaults to hiding fresh IPOs so an established company
+  // funds are buying for the FIRST time stands out (not this month's IPO crop).
+  const [hideRecentIpos, setHideRecentIpos] = useState(true);
   const all = useMemo(() => (capSel.size ? stocks.stocks.filter((s) => capPass(s.marketCap, capSel)) : stocks.stocks), [stocks, capSel]);
 
   const buys = useMemo(() => all.filter((s) => (s.netShareChange[L] ?? 0) > 0), [all, L]);
   const sells = useMemo(() => all.filter((s) => (s.netShareChange[L] ?? 0) < 0), [all, L]);
   const newEntries = useMemo(() => all.filter((s) => s.newEntry), [all]);
+  // Confirmed recent IPOs filtered out by default; established + unknown-age stay
+  // (we never hide a name just because its listing date is missing).
+  const newEntriesShown = useMemo(
+    () => (hideRecentIpos ? newEntries.filter((s) => s.recentIpo !== true) : newEntries),
+    [newEntries, hideRecentIpos],
+  );
   const turned = useMemo(() => all.filter((s) => {
     const a = s.netShareChange[L - 1], b = s.netShareChange[L];
     return a != null && b != null && a !== 0 && b !== 0 && Math.sign(a) !== Math.sign(b);
@@ -148,16 +157,27 @@ function Ideas({ summary, stocks }: { summary: SummaryMeta; stocks: StocksSummar
       )}
 
       {sub === 3 && (
-        <Section title="Brand-new to mutual funds" subtitle={`Stocks funds started holding this month. Our data starts ${firstMonth}, so “new” means first seen since then — coverage changes are excluded.`}>
-          {newEntries.length === 0 ? (
-            <Empty>No brand-new entries this month.</Empty>
+        <Section
+          title="Brand-new to mutual funds"
+          subtitle={`Stocks funds started holding this month. Our data starts ${firstMonth}, so “new” means first seen since then — coverage changes are excluded. Recent IPOs are hidden by default, so an established company funds are buying for the FIRST time stands out.`}
+        >
+          <label className="t-muted" style={{ display: "inline-flex", alignItems: "center", gap: 8, margin: "0 0 12px", cursor: "pointer" }}>
+            <input type="checkbox" checked={hideRecentIpos} onChange={(e) => setHideRecentIpos(e.target.checked)} />
+            Hide recent IPOs (listed &lt; 1&nbsp;year)
+            {hideRecentIpos && newEntries.length > newEntriesShown.length && (
+              <span>· {newEntries.length - newEntriesShown.length} hidden</span>
+            )}
+          </label>
+          {newEntriesShown.length === 0 ? (
+            <Empty>{newEntries.length === 0 ? "No brand-new entries this month." : "Only recent IPOs entered this month — untick to show them."}</Empty>
           ) : (
             <RankedTable
-              rows={newEntries}
-              grid="minmax(220px,2fr) 120px 150px 76px"
-              initialSort={1} initialDir={-1}
+              rows={newEntriesShown}
+              grid="minmax(200px,2fr) 88px 96px 140px 76px"
+              initialSort={2} initialDir={-1}
               columns={[
                 stockCol,
+                { label: "Listed", align: "right", sortValue: (r) => r.listedOn ?? null, render: (r) => <Listed r={r} /> },
                 { label: "Funds now", align: "right", sortValue: (r) => r.fundCount[L], render: (r) => <Plain v={r.fundCount[L]} /> },
                 netCol,
                 trendCol,
@@ -418,6 +438,17 @@ function Change({ v, note }: { v: number | null | undefined; note?: string }) {
 
 function Plain({ v }: { v: number | null | undefined }) {
   return <span className="num t-body">{v == null ? DASH : v.toLocaleString("en-IN")}</span>;
+}
+
+/** Listing-age cell: a chip for a recent IPO, the listing year for an established name, a dash when unknown. */
+function Listed({ r }: { r: StockRow }) {
+  if (!r.listedOn) return <span className="t-muted" title="Not on the NSE listing list">{DASH}</span>;
+  const yy = r.listedOn.slice(2, 4);
+  return r.recentIpo ? (
+    <span className="cap-pill" title={`Listed ${r.listedOn} — recent IPO`}>IPO&nbsp;’{yy}</span>
+  ) : (
+    <span className="num t-muted" title={`Listed ${r.listedOn}`}>’{yy}</span>
+  );
 }
 
 function AddTrim({ r }: { r: StockRow }) {

@@ -51,14 +51,17 @@ jobs:
       - name: Refresh AMFI market-cap list (half-yearly; non-fatal)
         run: npm run marketcap || echo "marketcap refresh failed — keeping existing data/marketcap.json"
 
+      - name: Refresh NSE listing dates (for the IPO-vs-established filter; non-fatal)
+        run: npm run listings || echo "listings refresh failed — keeping existing data/listings.json"
+
       - name: Derive browser summaries
         run: npm run derive
 
       - name: Commit derived summaries
         run: |
           # Raw months are committed during import (--commit). Here we commit the
-          # market-cap list + the small browser summaries.
-          git add data/marketcap.json public/data
+          # market-cap list, the NSE listing dates + the small browser summaries.
+          git add data/marketcap.json data/listings.json public/data
           if git diff --cached --quiet; then
             echo "No summary changes to commit."
           else

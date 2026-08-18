@@ -183,6 +183,15 @@ export interface StockRow {
   newEntry?: boolean;
   /** The fund holding the biggest slice of the mutual-fund-owned shares this month. */
   topHolder?: { fundName: string; fundHouse: string; sharePct: number };
+  /** Stock's exchange listing date "YYYY-MM-DD" (NSE), matched by ISIN. `null` when not on the list (never guessed). */
+  listedOn?: string | null;
+  /**
+   * Was the stock listed recently (a fresh IPO) relative to the latest data month?
+   * `true` = confirmed recent, `false` = confirmed long-established, `undefined` =
+   * listing date unknown. Lets "Brand-new entries" filter out IPO noise so an
+   * old company mutual funds are buying for the FIRST time stands out.
+   */
+  recentIpo?: boolean;
 }
 
 /** `public/data/stocks/<ISIN>.json` — per-stock detail, loaded on demand. */
@@ -203,6 +212,15 @@ export interface StockDetail {
   netShareChange: (number | null)[];
   /** The funds that hold (or held) this stock, with each fund's own trend. */
   funds: FundTrend[];
+  /** Stock's NSE listing date "YYYY-MM-DD", matched by ISIN. `null` when unknown. */
+  listedOn?: string | null;
+  /**
+   * Detected bonus/split months: shares jumped while market value stayed ~flat,
+   * so that month's share change is a corporate action, NOT fund buying. `index`
+   * is into `months`; `ratio` is the rough multiple (~2 for a 1:1 bonus). Derive
+   * neutralises the flow for these months; the UI shows why instead of a fake buy.
+   */
+  corporateActions?: { index: number; ratio: number }[];
 }
 
 export interface FundTrend {

@@ -113,7 +113,7 @@ giants) and older months keep our deeper AdvisorKhoj history.
 
 Workflows (both use proxy-aware `undici` locally, direct egress in CI):
 - `.github/workflows/sync-amfibeas.yml` — the scheduled monthly job (10th–15th,
-  just after AMFIBEAS refreshes): import → `marketcap` → `derive` → commit. Needs
+  just after AMFIBEAS refreshes): import → `marketcap` → `listings` → `derive` → commit. Needs
   **no secrets**. Also `workflow_dispatch` + a `repository_dispatch`
   (`amfibeas-updated`) hook so AMFIBEAS can trigger a near-real-time sync.
 - `.github/workflows/ingest.yml` — the AdvisorKhoj + scrape.do scraper, kept as an
@@ -145,11 +145,30 @@ so per-fund views and fund COUNTS stay honest. Stock/house TOTALS are unaffected
 (a house's schemes sum the same either way); the newest month (AMFIBEAS) has no
 such collisions. This is retroactive — no re-scrape needed.
 
+**Passive/index funds are excluded (a data-hygiene rule in derive).** Index funds
+and ETFs mechanically mirror whatever their benchmark holds, so their "buying" is
+noise, not active conviction. `indexMonth` drops every index/ETF scheme
+(name-classified — `ETF`/`INDEX`/`NIFTY`/`SENSEX`/`BEES`…, calibrated to skip
+actively-managed "Active Momentum" and "Liquid" debt funds) from ALL aggregates:
+stock totals, month-over-month flows, fund counts, sector flows, trendsetters. A
+house still counts as "present" for coverage if it disclosed anything, so the
+"X of Y houses" headline is unaffected; the per-month *active* fund count drops.
+
+**Bonus/split neutralisation (a data-hygiene rule in derive).** A split or bonus
+multiplies every holder's share count with no real buying. `flowDetail` detects it
+(continuing holders' shares jump ≥1.7× while their combined market value stays
+~flat) and reports that month's flow as UNKNOWN (`null`) — so a corporate action
+never shows as a buy in the net change, the buy/sell streaks, the sector flows, the
+Overview totals or the per-fund change. Detected actions ride on
+`StockDetail.corporateActions` so the stock page explains the jump. Stored share
+COUNTS are left untouched (Rule 2/5) — only the derived *flow* is neutralised.
+
 **Presentation-only signals (`src/lib/signals.ts`).** Readings computed at display
 time from the already-served arrays — no new data, no change to stored numbers:
 implied price (value ÷ shares, no external feed), buy/sell streaks (the "quiet
-accumulation" list), battleground intensity (funds split), split/bonus detection,
-entry/exit counts. Coverage-aware inputs mean a `null` month breaks a streak.
+accumulation" list), battleground intensity (funds split), split/bonus detection
+(the display hint; derive also neutralises the flow, above), entry/exit counts.
+Coverage-aware inputs mean a `null` month breaks a streak.
 
 **Coverage-awareness (the core Step-3 rule).** A month-over-month change is only
 computed from funds whose fund HOUSE is present in BOTH months. If a house is a
@@ -166,6 +185,15 @@ AMFI's half-yearly list, matched by ISIN: `scripts/marketcap.ts` (`npm run
 marketcap`) fetches the latest list → `data/marketcap.json` (not served); derive
 tags each stock, leaving `null` when not confidently matched (never guessed).
 
+Each stock also carries a **listing date** (`listedOn`) and a `recentIpo` flag from
+NSE's official equity list, matched by ISIN: `scripts/listings.ts` (`npm run
+listings`) fetches `EQUITY_L.csv` → `data/listings.json` (not served); derive tags
+each stock's age (`recentIpo` = listed within a year of the latest month). This
+powers the **Brand-new entries** IPO filter — hide the fresh-IPO crop so an
+established company mutual funds are buying for the FIRST time stands out. Age is
+`null`/unknown when the stock isn't on NSE's list (BSE-only, delisted) — never
+guessed, and such names are never wrongly labelled recent or established.
+
 ## Tech stack
 
 - **React 19 + TypeScript + Tailwind CSS v4**, built with **Vite**.
@@ -181,7 +209,9 @@ tags each stock, leaving `null` when not confidently matched (never guessed).
 worker/index.ts            Cloudflare Worker: static-asset pass-through (no auth)
 scripts/ingest-amfibeas.ts Primary source: import AMFIBEAS holdings (all ~50 houses) → data/months/…
 scripts/ingest.ts          AdvisorKhoj scraper (on-demand): download + parse → data/months/<YYYY-MM>.json.gz
-scripts/derive.ts          Derive: raw months → small summaries in public/data
+scripts/marketcap.ts       Reference: AMFI large/mid/small-cap list → data/marketcap.json (input to derive)
+scripts/listings.ts        Reference: NSE listing dates (IPO-vs-established) → data/listings.json (input to derive)
+scripts/derive.ts          Derive: raw months → small summaries in public/data (drops passive/ETF; neutralises splits)
 .github/workflows/sync-amfibeas.yml  Monthly AMFIBEAS sync + derive (primary; no secrets)
 .github/workflows/ingest.yml  AdvisorKhoj ingest + derive (on-demand)
 data/months/               Raw month files (NOT served; input to derive)
@@ -216,10 +246,12 @@ npm run build     # tsc -b (type-check) + vite build → dist/
 npm run preview   # Serve the production build through the Worker locally
 npm run deploy    # derive, build, then wrangler deploy
 npm run ingest:amfibeas       # PRIMARY: import AMFIBEAS full-coverage holdings → data/months/
-npm run data:amfibeas         # ingest:amfibeas, then marketcap, then derive
+npm run data:amfibeas         # ingest:amfibeas, then marketcap, listings, derive
 npm run ingest -- --latest    # AdvisorKhoj scraper (on-demand): latest full month → data/months/
+npm run marketcap             # refresh AMFI cap list → data/marketcap.json (input to derive)
+npm run listings              # refresh NSE listing dates → data/listings.json (input to derive)
 npm run derive                # rebuild the browser summaries from data/months/
-npm run data                  # ingest --latest, then derive
+npm run data                  # ingest --latest, then marketcap, listings, derive
 ```
 
 ## Ingestion secrets
@@ -242,8 +274,8 @@ chart-mark rules) — use it exactly; never invent colours or fonts. The app is
 **tabbed**, path-based: `/` Overview (macro flows only, incl. a **sector-rotation
 heatmap**), `/stocks` the table, `/funds` the picker (topped by the **Trendsetters**
 strip), `/ideas` the idea lists (subtabs: Quiet accumulation · Buying & selling ·
-Battleground · Brand-new · Turned around · Ownership & crowding · Follow the funds —
-the biggest-mover leaderboards live ONLY here), plus `/stock/<ISIN>` and
+Battleground · Brand-new [recent IPOs hidden by default] · Turned around · Ownership
+& crowding · Follow the funds — the biggest-mover leaderboards live ONLY here), plus `/stock/<ISIN>` and
 `/fund/<key>` detail pages. The stock page's trend chart toggles **Total** (shares /
 value / implied price) vs **By fund** (a picked fund's own shares / % of portfolio),
 and carries an **Ownership over time** panel (fund-count trend + entry/exit

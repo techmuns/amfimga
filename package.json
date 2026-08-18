@@ -13,9 +13,10 @@
     "ingest": "tsx scripts/ingest.ts",
     "ingest:amfibeas": "tsx scripts/ingest-amfibeas.ts",
     "marketcap": "tsx scripts/marketcap.ts",
+    "listings": "tsx scripts/listings.ts",
     "derive": "tsx scripts/derive.ts",
-    "data": "npm run ingest -- --latest && npm run marketcap && npm run derive",
-    "data:amfibeas": "npm run ingest:amfibeas && npm run marketcap && npm run derive"
+    "data": "npm run ingest -- --latest && npm run marketcap && npm run listings && npm run derive",
+    "data:amfibeas": "npm run ingest:amfibeas && npm run marketcap && npm run listings && npm run derive"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
