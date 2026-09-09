@@ -13,6 +13,7 @@ import { StockDetailPage } from "./components/StockDetail";
 import { IdeasPage } from "./components/Ideas";
 import { FundDetailPage, FundsPage } from "./components/FundView";
 import { Overview } from "./components/Overview";
+import { BriefButton } from "./components/BriefPanel";
 
 type Data = { summary: SummaryMeta; stocks: StocksSummary; sectors: SectorSummary };
 type LoadState = { status: "loading" } | { status: "error"; reason: string } | { status: "ready"; data: Data };
@@ -77,6 +78,7 @@ function Tabbed({ path }: { path: string }) {
         </div>
         <div className="ml-auto flex items-center gap-2">
           {data && <ExportMenu data={data} />}
+          <BriefButton />
           <ThemeToggle />
         </div>
       </header>

@@ -1,0 +1,24 @@
+# Local secrets for the email-digest Worker (npm run dev / npm run preview).
+# Copy to `.dev.vars` (git-ignored). Everything here is OPTIONAL: without it the
+# /api/* routes simply report "not configured" and the dashboard is unaffected.
+#
+# In production these are Worker secrets/vars, NOT committed — set them with
+# `npx wrangler secret put <NAME>` (see docs/email-digest.md).
+
+# Munshot Raw Email API bearer token. Enables actual sending; without it, sends
+# are skipped (no crash).
+MUNS_TOKEN=
+
+# Shared secret guarding POST /api/run-digests (sent as the `x-digest-key`
+# header by the hourly GitHub Action). Use a long random string; the SAME value
+# goes into the repo's GitHub Actions secret DIGEST_KEY.
+DIGEST_KEY=
+
+# Optional — override the email endpoint (default: https://devde.muns.io/email/send/raw).
+# MUNS_EMAIL_ENDPOINT=
+
+# Optional — canonical site origin used in email links (default: the request origin).
+# SITE_URL=https://amfimga.example
+
+# Optional — set to "true" to send the digest even when nothing changed (testing).
+# SEND_EMPTY=

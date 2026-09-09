@@ -12,4 +12,21 @@
   "observability": {
     "enabled": true
   }
+
+  // --- Email digest (ADDITIVE + OPTIONAL — see docs/email-digest.md) --------
+  // The /api/* routes (subscribe · unsubscribe · run-digests · send-now) need a
+  // KV namespace plus a couple of secrets. Until those are added the dashboard
+  // runs EXACTLY as before and every digest endpoint returns a clean
+  // "not-configured" reason instead of crashing — so committing this is safe and
+  // the connected auto-deploy stays green. ONE-TIME setup to switch it on:
+  //
+  //   1) npx wrangler kv namespace create DIGEST_KV
+  //   2) uncomment the block below and paste the returned id
+  //   3) npx wrangler secret put MUNS_TOKEN     # Munshot email bearer token
+  //      npx wrangler secret put DIGEST_KEY     # long random string; also a GH secret
+  //      (optional) SITE_URL, MUNS_EMAIL_ENDPOINT, SEND_EMPTY
+  //
+  // "kv_namespaces": [
+  //   { "binding": "DIGEST_KV", "id": "PASTE_KV_ID_HERE" }
+  // ]
 }

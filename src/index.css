@@ -330,4 +330,32 @@
     border-radius: 10px; padding: 10px 12px; cursor: pointer; min-width: 0;
   }
   .ts-card:hover { background: var(--flat); border-color: var(--axis); }
+
+  /* ---- Brief (email digest) slide-in panel ---- */
+  .brief-overlay { position: fixed; inset: 0; background: rgba(10, 10, 10, 0.30); z-index: 50; display: flex; justify-content: flex-end; }
+  .brief-drawer {
+    width: 384px; max-width: 92vw; height: 100dvh; border-radius: 0; border: none;
+    border-left: 1px solid var(--border); padding: 20px 22px 28px; overflow-y: auto;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.18);
+  }
+  .brief-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .brief-label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 16px 0 6px; }
+  .brief-input { width: 100%; box-sizing: border-box; }
+  .brief-checks { display: flex; flex-direction: column; gap: 8px; }
+  .brief-check { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+  .brief-check:hover { background: var(--flat); }
+  .brief-check input { margin-top: 2px; flex: 0 0 auto; }
+  .brief-check-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .brief-check-note { display: block; font-size: 11px; margin-top: 1px; }
+  .brief-primary {
+    width: 100%; margin-top: 18px; padding: 11px 14px; border-radius: 8px;
+    background: var(--ink); color: var(--surface); border: 1px solid var(--ink);
+    font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .brief-primary:disabled { opacity: 0.45; cursor: default; }
+  .brief-secondary { width: 100%; display: flex; align-items: center; justify-content: center; }
+  .brief-or { display: flex; align-items: center; text-align: center; color: var(--muted); font-size: 11px; margin: 14px 0; }
+  .brief-or::before, .brief-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+  .brief-or span { padding: 0 10px; }
+  .brief-msg { font-size: 12.5px; margin-top: 14px; line-height: 1.5; }
 }

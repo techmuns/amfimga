@@ -227,6 +227,22 @@ totals/flows) and clearly labelled.
   **nothing** until fact sheets are loaded — no empty/fake section on the live site
   (Rule 2/5). Needs the client's fact-sheet data to go live.
 
+## Email digest (the "Brief" — additive & optional)
+
+A reader can subscribe to a monthly email of what the funds bought/sold. It is
+**additive and never touches the data or analysis** (like Export), and it
+**degrades gracefully**: with no KV or email secret the dashboard runs exactly as
+before and the `/api/*` routes return a clean "not-configured" reason (Rule 5 in
+spirit — a missing dependency is never a crash). Lives in the same Worker:
+`/api/*` is handled by `worker/api.ts`, everything else still passes through to
+ASSETS. The digest is built server-side from the SAME served summaries the
+browser loads (`worker/digest.ts`), so it inherits coverage-awareness and never
+invents a number (Rule 2). It only emails when a **content signature changes**
+(new month / shifted coverage) — never a daily repeat. The email uses the
+**Munshot newspaper house style** (serif MUNSHOT masthead, cream paper, "Powered
+by Munshot · muns.io" footer) shared with the sibling dashboards, with AMFIMGA as
+the edition. Full docs + the one-time setup checklist: `docs/email-digest.md`.
+
 ## Tech stack
 
 - **React 19 + TypeScript + Tailwind CSS v4**, built with **Vite**.
