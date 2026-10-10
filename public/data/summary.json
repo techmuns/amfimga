@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-15T14:03:25.437Z",
+  "generatedAt": "2026-10-10T14:57:11.846Z",
   "topSectors": [
     "Financial Services",
     "Consumer Discretionary",
@@ -145,7 +145,7 @@
       "label": "May 2026",
       "housesPresent": 44,
       "housesTotal": 50,
-      "fundCount": 959,
+      "fundCount": 986,
       "stockCount": 1136
     },
     {
@@ -153,24 +153,32 @@
       "label": "June 2026",
       "housesPresent": 46,
       "housesTotal": 50,
-      "fundCount": 1044,
+      "fundCount": 1070,
       "stockCount": 1136
     },
     {
       "month": "2026-07",
       "label": "July 2026",
-      "housesPresent": 46,
+      "housesPresent": 47,
       "housesTotal": 50,
-      "fundCount": 968,
-      "stockCount": 1160
+      "fundCount": 1034,
+      "stockCount": 1163
     },
     {
       "month": "2026-08",
       "label": "August 2026",
-      "housesPresent": 34,
+      "housesPresent": 46,
       "housesTotal": 50,
-      "fundCount": 787,
-      "stockCount": 1135
+      "fundCount": 988,
+      "stockCount": 1169
+    },
+    {
+      "month": "2026-09",
+      "label": "September 2026",
+      "housesPresent": 40,
+      "housesTotal": 50,
+      "fundCount": 810,
+      "stockCount": 1128
     }
   ]
 }
