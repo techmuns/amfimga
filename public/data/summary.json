@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-15T13:50:00.129Z",
+  "generatedAt": "2026-11-10T16:43:10.584Z",
   "topSectors": [
     "Financial Services",
     "Consumer Discretionary",
@@ -8,8 +8,8 @@
     "Healthcare",
     "Materials",
     "Information Technology",
-    "Energy",
-    "Consumer Staples"
+    "Consumer Staples",
+    "Energy"
   ],
   "months": [
     {
@@ -87,10 +87,10 @@
     {
       "month": "2025-10",
       "label": "October 2025",
-      "housesPresent": 13,
+      "housesPresent": 14,
       "housesTotal": 50,
-      "fundCount": 272,
-      "stockCount": 831
+      "fundCount": 290,
+      "stockCount": 848
     },
     {
       "month": "2025-11",
@@ -179,6 +179,14 @@
       "housesTotal": 50,
       "fundCount": 810,
       "stockCount": 1128
+    },
+    {
+      "month": "2026-10",
+      "label": "October 2026",
+      "housesPresent": 29,
+      "housesTotal": 50,
+      "fundCount": 621,
+      "stockCount": 1044
     }
   ]
 }
